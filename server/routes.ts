@@ -272,7 +272,8 @@ Return JSON format:
             questionType: qData.questionType,
             content: {
               question: qData.question,
-              options: qData.options
+              options: qData.options,
+              formContext: qData.formContext // Include form context for form_completion questions
             },
             correctAnswers: Array.isArray(qData.correctAnswer) ?
             qData.correctAnswer.map(ans => typeof ans === 'object' ? JSON.stringify(ans) : String(ans)) :

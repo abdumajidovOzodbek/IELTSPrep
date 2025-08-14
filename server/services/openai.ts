@@ -1,4 +1,3 @@
-
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Initialize Gemini AI with API key
@@ -50,7 +49,7 @@ export class GeminiService {
 
   private handleError(error: any): AIResponse {
     console.error('Gemini AI Error:', error);
-    
+
     // Check if it's a quota exceeded error
     if (error.status === 429) {
       return {
@@ -59,7 +58,7 @@ export class GeminiService {
         rawResponse: error
       };
     }
-    
+
     return {
       success: false,
       error: error.message || 'AI service unavailable',
@@ -129,7 +128,7 @@ Output JSON only with fields:
 
       const response = await result.response;
       const jsonResult = JSON.parse(response.text() || '{}');
-      
+
       return {
         success: true,
         data: jsonResult,
@@ -176,7 +175,7 @@ Output JSON only with fields:
 
       const response = await result.response;
       const jsonResult = JSON.parse(response.text() || '{}');
-      
+
       return {
         success: true,
         data: jsonResult,
@@ -199,16 +198,16 @@ Output JSON only with fields:
     try {
       // Convert audio buffer to base64 for Gemini processing
       const base64Audio = audioBuffer.toString('base64');
-      
+
       // Use Gemini to analyze the audio and provide transcription
       const prompt = `Please transcribe this audio file. Provide an accurate, word-for-word transcription of all speech in the audio. Include speaker identification if multiple speakers are present. Format as natural dialogue or monologue as appropriate.`;
 
       const result = await this.model.generateContent({
         contents: [{
-          role: "user", 
+          role: "user",
           parts: [
             { text: prompt },
-            { 
+            {
               inlineData: {
                 mimeType: "audio/mpeg", // Adjust based on actual audio format
                 data: base64Audio
@@ -263,7 +262,7 @@ Return JSON array only.`;
 
       const response = await result.response;
       const jsonResult = JSON.parse(response.text() || '[]');
-      
+
       return {
         success: true,
         data: jsonResult,
@@ -295,7 +294,7 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
 
       const response = await result.response;
       const jsonResult = JSON.parse(response.text() || '{}');
-      
+
       return {
         success: true,
         data: jsonResult,
@@ -325,13 +324,13 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
 
       Section 1: Everyday conversation (social survival) - 2 speakers
       - Form completion (Questions 1-5): Complete form with NO MORE THAN THREE WORDS AND/OR A NUMBER
-      - Multiple choice (Questions 6-7): Choose correct letters 
+      - Multiple choice (Questions 6-7): Choose correct letters
       - Sentence completion (Questions 8-10): Fill blanks with NO MORE THAN THREE WORDS
 
       Section 2: Monologue in everyday context - 1 speaker
       - Note completion (Questions 11-20): Complete notes with NO MORE THAN THREE WORDS AND/OR A NUMBER
 
-      Section 3: Academic conversation - up to 4 speakers  
+      Section 3: Academic conversation - up to 4 speakers
       - Sentence completion (Questions 21-24): NO MORE THAN THREE WORDS AND/OR A NUMBER
       - Chart completion (Questions 25-27): ONE WORD AND/OR A NUMBER
       - Multiple choice (Questions 28-30): Choose THREE correct letters
@@ -359,7 +358,7 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
                 "orderIndex": 1
               },
               {
-                "_id": "q6", 
+                "_id": "q6",
                 "questionType": "multiple_choice",
                 "content": {
                   "question": "Which TWO things does the student prefer?",
@@ -387,19 +386,160 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
 
       const response = await result.response;
       let responseText = response.text() || '{}';
-      
+
       // Clean any markdown code block wrappers
       responseText = responseText.replace(/```json\s*|\s*```/g, '').trim();
-      
+
       console.log("AI Generated Listening Content:", responseText.substring(0, 500) + "...");
       const content = JSON.parse(responseText);
 
+      // This function is intended to generate the full listening test,
+      // so we will iterate through each section and generate its questions.
+      const generatedSections = await Promise.all(content.sections.map(async (section: any) => {
+        let sectionNum = section.sectionNumber;
+        let sectionDescription = "";
+        let questionTypes: string[] = [];
+
+        switch(sectionNum) {
+          case 1:
+            sectionDescription = "Section 1 - Social/Everyday Context (2 speakers, telephone conversation, form completion, basic information)";
+            questionTypes = ["form_completion", "form_completion", "form_completion", "form_completion", "form_completion", "multiple_choice", "multiple_choice", "fill_blank", "fill_blank", "fill_blank"];
+            break;
+          case 2:
+            sectionDescription = "Section 2 - Monologue in everyday context (1 speaker, information about a place or event)";
+            questionTypes = ["fill_blank", "fill_blank", "fill_blank", "fill_blank", "fill_blank", "fill_blank", "fill_blank", "fill_blank", "fill_blank", "fill_blank"];
+            break;
+          case 3:
+            sectionDescription = "Section 3 - Academic conversation (2-4 speakers, discussion about a study topic)";
+            questionTypes = ["fill_blank", "fill_blank", "fill_blank", "fill_blank", "fill_blank", "fill_blank", "fill_blank", "multiple_choice", "multiple_choice", "multiple_choice"];
+            break;
+          case 4:
+            sectionDescription = "Section 4 - Academic lecture (1 speaker, lecture on a scientific or academic topic)";
+            questionTypes = ["fill_blank", "fill_blank", "fill_blank", "fill_blank", "fill_blank", "fill_blank", "fill_blank", "fill_blank", "fill_blank", "fill_blank"];
+            break;
+          default:
+            sectionDescription = "Unknown Section";
+            questionTypes = Array(10).fill("fill_blank");
+        }
+
+        const contentGenerationPrompt = `You are an expert IELTS test developer. Carefully analyze this audio transcript to create exactly 10 authentic IELTS listening questions for ${sectionDescription}.
+
+TRANSCRIPT ANALYSIS REQUIRED:
+"${section.transcript}"
+
+CRITICAL INSTRUCTIONS:
+1. Read the transcript carefully and identify key information: names, numbers, dates, places, actions, opinions, reasons, processes
+2. Generate EXACTLY 10 questions that test different aspects mentioned in the transcript
+3. Each question MUST be answerable from the transcript content
+4. Use the specified question types in order: ${questionTypes.join(", ")}
+
+QUESTION DIFFICULTY PROGRESSION:
+- Questions 1-3: Direct factual information (clearly stated details)
+- Questions 4-7: Moderate difficulty (require careful listening, may involve paraphrasing)  
+- Questions 8-10: Challenging (inference, detailed understanding, multiple details)
+
+QUESTION TYPE SPECIFICATIONS:
+- form_completion: Create realistic form fields as they appear in IELTS Section 1. Use contexts like: application forms, booking forms, registration forms, membership forms, etc. Format each as "Field Label: _______" 
+- multiple_choice: Create 4 realistic options with ONLY ONE correct answer from transcript
+- fill_blank: Use words/phrases/numbers that are clearly spoken in the audio
+
+FORM COMPLETION CONTEXTS (Section 1):
+- Personal information forms (name, address, phone, email, age, occupation)
+- Booking/reservation forms (dates, times, numbers of people, special requirements)
+- Application forms (course enrollment, membership, job applications)
+- Registration forms (events, services, programs)
+
+ANSWER REQUIREMENTS:
+- All answers must be directly extractable from the transcript
+- For form_completion: Use exact words/numbers from transcript, create realistic form labels like "First name:", "Telephone number:", "Date of birth:", etc.
+- For fill_blank: Use exact words/numbers from transcript (max 3 words)
+- For multiple_choice: Correct option must match transcript information exactly
+
+Return JSON format:
+{
+  "sectionTitle": "Appropriate title for ${sectionDescription}",
+  "instructions": "Listen to the ${sectionNum === 1 ? 'conversation' : sectionNum === 2 || sectionNum === 4 ? 'talk' : 'discussion'} and answer Questions ${(sectionNum-1)*10 + 1}-${sectionNum*10}. Write NO MORE THAN THREE WORDS AND/OR A NUMBER for each answer.",
+  "formTitle": "Application Form", // for form_completion sections
+  "questions": [
+    {
+      "questionType": "${questionTypes[0]}",
+      "question": "First name: _______", // for form_completion, use realistic form field labels
+      "correctAnswer": "Exact word/phrase from transcript",
+      "orderIndex": 1,
+      "formContext": { // required for form_completion
+        "formTitle": "Course Application Form",
+        "fieldLabel": "First name",
+        "fieldType": "text"
+      }
+    }
+    // Continue for all 10 questions, ensuring each tests different transcript content
+  ]
+}`;
+
+        const questionGenerationResult = await this.model.generateContent({
+          contents: [{ role: "user", parts: [{ text: contentGenerationPrompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            maxOutputTokens: 4000, // Increased tokens for more complex JSON output
+            temperature: 0.7,
+          },
+        });
+
+        const questionResponse = await questionGenerationResult.response;
+        let questionResponseText = questionResponse.text() || '{}';
+        questionResponseText = questionResponseText.replace(/```json\s*|\s*```/g, '').trim();
+
+        const generatedQuestions = JSON.parse(questionResponseText);
+
+        // Update the section with generated questions and adjust instructions for form completion
+        let updatedInstructions = generatedQuestions.instructions;
+        if (questionTypes.includes("form_completion") && sectionNum === 1) {
+          updatedInstructions = "Complete the form below. Write NO MORE THAN THREE WORDS AND/OR A NUMBER for each answer.";
+        }
+
+        return {
+          ...section, // Keep original section details like transcript
+          title: generatedQuestions.sectionTitle || section.title,
+          instructions: updatedInstructions,
+          questions: generatedQuestions.questions.map((q: any, index: number) => {
+            // Ensure questionType is correctly set from questionTypes array
+            const finalQuestionType = questionTypes[index] || q.questionType; // Fallback to AI's type if needed
+
+            // Add formContext for form_completion questions
+            if (finalQuestionType === "form_completion") {
+              return {
+                ...q,
+                questionType: finalQuestionType,
+                question: `${generatedQuestions.formTitle || "Form Field"}: _______`, // Default label if not explicitly set
+                formContext: {
+                  formTitle: generatedQuestions.formTitle || "Generic Form",
+                  fieldLabel: q.question.split(':')[0] || "Form Field", // Extract label from question if present
+                  fieldType: "text" // Default type, can be inferred or set later
+                },
+                // Use correctAnswer directly if provided, otherwise assume it's in the question string
+                correctAnswer: q.correctAnswer || q.question.split(': ')[1]?.replace(' _______', '').trim() || 'N/A',
+              };
+            } else {
+              // For other question types, ensure correct structure
+              return {
+                ...q,
+                questionType: finalQuestionType,
+                correctAnswer: q.correctAnswer || 'N/A', // Ensure correctAnswer exists
+                orderIndex: index + 1 // Ensure orderIndex is sequential
+              };
+            }
+          }),
+          audioUrl: section.audioUrl // Preserve original audioUrl if present
+        };
+      }));
+
       return {
         success: true,
-        data: content,
-        rawResponse: response
+        data: { sections: generatedSections },
+        rawResponse: response // Original response from the initial prompt
       };
     } catch (error: any) {
+      console.error("Error in generateListeningContent:", error);
       return this.handleError(error);
     }
   }

@@ -272,10 +272,8 @@ export default function ListeningTestPage() {
                         const questionText = question?.content?.question || question?.question || '';
                         const isAnswered = !!answers[question._id];
                         
-                        // Check if it's a form completion question (has blanks to fill)
-                        const isFormCompletion = questionText.includes('_______') || questionText.includes('__________');
-                        
-                        // Check if it's multiple choice
+                        // Check question type
+                        const isFormCompletion = question.questionType === 'form_completion' || questionText.includes('_______') || questionText.includes('__________');
                         const isMultipleChoice = question?.content?.options && Array.isArray(question.content.options) && question.content.options.length > 0;
                         
                         return (
@@ -284,44 +282,66 @@ export default function ListeningTestPage() {
                               ? 'border-green-300 bg-green-50' 
                               : 'border-slate-200 bg-slate-50 hover:border-primary/40'
                           }`}>
-                            {/* Form Completion Style - Compact */}
+                            {/* Form Completion Style - Enhanced */}
                             {isFormCompletion && (
-                              <div className="space-y-2">
+                              <div className="space-y-3">
                                 <div className="flex items-center space-x-2">
-                                  <div className="flex-shrink-0 w-6 h-6 bg-teal-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                                  <div className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
                                     {questionNumber}
                                   </div>
-                                  <span className="text-xs text-slate-500 font-medium">Form Completion</span>
+                                  <span className="text-xs text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded">Form Completion</span>
                                 </div>
-                                <div 
-                                  className="text-slate-800 text-sm leading-relaxed"
-                                  dangerouslySetInnerHTML={{
-                                    __html: questionText.replace(
-                                      /_______+/g,
-                                      `<input 
-                                        type="text" 
-                                        value="${answers[question._id] || ''}"
-                                        style="
-                                          border: 1px solid #0891b2; 
-                                          background: white; 
-                                          padding: 4px 6px; 
-                                          min-width: 80px; 
-                                          font-size: 12px;
-                                          outline: none;
-                                          margin: 0 2px;
-                                          border-radius: 4px;
-                                        "
-                                        placeholder="..."
-                                        onchange="this.dispatchEvent(new CustomEvent('answer-change', {detail: {questionId: '${question._id}', value: this.value}}))"
-                                      />`
-                                    )
-                                  }}
-                                  onInput={(e: any) => {
-                                    if (e.target.tagName === 'INPUT') {
-                                      handleAnswerChange(question._id, e.target.value);
-                                    }
-                                  }}
-                                />
+                                
+                                {/* Render as form field if it has form context */}
+                                {question.formContext ? (
+                                  <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                                    <div className="grid grid-cols-1 gap-3">
+                                      <div className="flex items-center justify-between">
+                                        <label className="text-slate-700 font-medium text-sm">
+                                          {question.formContext.fieldLabel || question.question}
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={answers[question._id] || ''}
+                                          onChange={(e) => handleAnswerChange(question._id, e.target.value)}
+                                          className="border-b-2 border-blue-500 bg-transparent px-2 py-1 text-sm focus:outline-none focus:border-blue-600 min-w-[120px]"
+                                          placeholder="..."
+                                          maxLength={30}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  /* Fallback to inline form completion */
+                                  <div 
+                                    className="text-slate-800 text-sm leading-relaxed bg-slate-50 p-3 rounded-lg"
+                                    dangerouslySetInnerHTML={{
+                                      __html: questionText.replace(
+                                        /_______+/g,
+                                        `<input 
+                                          type="text" 
+                                          value="${answers[question._id] || ''}"
+                                          style="
+                                            border-bottom: 2px solid #2563eb; 
+                                            background: transparent; 
+                                            padding: 4px 8px; 
+                                            min-width: 100px; 
+                                            font-size: 13px;
+                                            outline: none;
+                                            margin: 0 4px;
+                                          "
+                                          placeholder="..."
+                                          onchange="this.dispatchEvent(new CustomEvent('answer-change', {detail: {questionId: '${question._id}', value: this.value}}))"
+                                        />`
+                                      )
+                                    }}
+                                    onInput={(e: any) => {
+                                      if (e.target.tagName === 'INPUT') {
+                                        handleAnswerChange(question._id, e.target.value);
+                                      }
+                                    }}
+                                  />
+                                )}
                               </div>
                             )}
 

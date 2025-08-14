@@ -79,7 +79,7 @@ export const insertAudioFileSchema = audioFileSchema.omit({ _id: true, uploadedA
 export const testQuestionSchema = z.object({
   _id: z.instanceof(ObjectId).optional(),
   section: z.enum(["listening", "reading", "writing", "speaking"]),
-  questionType: z.enum(["multiple_choice", "fill_blank", "short_answer", "essay", "speaking_task", "matching", "map_labeling"]),
+  questionType: z.enum(["multiple_choice", "fill_blank", "short_answer", "essay", "speaking_task", "matching", "map_labeling", "form_completion"]),
   content: z.record(z.any()),
   correctAnswers: z.array(z.string()).optional(),
   orderIndex: z.number(),
@@ -163,4 +163,4 @@ export type InsertAudioRecording = z.infer<typeof insertAudioRecordingSchema>;
 // Enums for validation
 export const TestSectionEnum = z.enum(["listening", "reading", "writing", "speaking"]);
 export const TestStatusEnum = z.enum(["in_progress", "completed", "paused"]);
-export const QuestionTypeEnum = z.enum(["multiple_choice", "fill_blank", "short_answer", "essay", "speaking_task", "matching", "map_labeling"]);
+export const QuestionTypeEnum = z.enum(["multiple_choice", "fill_blank", "short_answer", "essay", "speaking_task", "matching", "map_labeling", "form_completion"]);

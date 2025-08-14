@@ -111,17 +111,57 @@
 /* Custom styles for IELTS listening test questions */
 .ielts-form-input {
   border: none !important;
-  border-bottom: 2px solid #0891b2 !important;
+  border-bottom: 2px solid #2563eb !important;
   background: transparent !important;
-  padding: 2px 8px !important;
+  padding: 4px 8px !important;
   min-width: 120px !important;
-  font-size: inherit !important;
+  font-size: 13px !important;
   outline: none !important;
   margin: 0 4px !important;
+  transition: border-color 0.2s ease;
 }
 
 .ielts-form-input:focus {
-  border-bottom-color: #0e7490 !important;
+  border-bottom-color: #1d4ed8 !important;
+}
+
+.ielts-form-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.ielts-form-field:hover {
+  background-color: #f1f5f9;
+}
+
+.ielts-form-label {
+  font-weight: 500;
+  color: #374151;
+  font-size: 14px;
+  flex: 1;
+}
+
+.ielts-form-completion-container {
+  background-color: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 8px 0;
+}
+
+.ielts-form-title {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 12px;
+  font-size: 16px;
+  border-bottom: 2px solid #3b82f6;
+  padding-bottom: 4px;
 }
 
 .ielts-question-number {
