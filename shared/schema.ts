@@ -129,9 +129,6 @@ export const audioRecordingSchema = z.object({
 // Insert schemas (for validation before DB insert)
 export const insertUserSchema = userSchema.omit({ _id: true, createdAt: true });
 export const insertTestSessionSchema = testSessionSchema.omit({ _id: true, startTime: true });
-export const insertListeningTestSchema = listeningTestSchema.omit({ _id: true, createdAt: true, updatedAt: true });
-
-export const insertListeningSectionSchema = listeningSectionSchema.omit({ _id: true, createdAt: true });
 
 export const insertReadingTestSchema = z.object({
   title: z.string().min(1),
