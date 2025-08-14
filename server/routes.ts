@@ -177,37 +177,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
             break;
         }
 
-        const contentGenerationPrompt = `You are an IELTS test developer. Based on the following transcript, create exactly 10 IELTS listening questions for ${sectionDescription}.
+        const contentGenerationPrompt = `You are an expert IELTS test developer. Carefully analyze this audio transcript to create exactly 10 authentic IELTS listening questions for ${sectionDescription}.
 
-IMPORTANT: Generate EXACTLY 10 questions, no more, no less. Each question must be based on specific information mentioned in the transcript.
+TRANSCRIPT ANALYSIS REQUIRED:
+"${transcript}"
 
-Transcript: "${transcript}"
+CRITICAL INSTRUCTIONS:
+1. Read the transcript carefully and identify key information: names, numbers, dates, places, actions, opinions, reasons, processes
+2. Generate EXACTLY 10 questions that test different aspects mentioned in the transcript
+3. Each question MUST be answerable from the transcript content
+4. Use the specified question types in order: ${questionTypes.join(", ")}
 
-Question Types to Use (in order): ${questionTypes.join(", ")}
+QUESTION DIFFICULTY PROGRESSION:
+- Questions 1-3: Direct factual information (clearly stated details)
+- Questions 4-7: Moderate difficulty (require careful listening, may involve paraphrasing)
+- Questions 8-10: Challenging (inference, detailed understanding, multiple details)
 
-Guidelines:
-- Questions 1-3: Easy (basic information, clear answers)
-- Questions 4-7: Medium (inference, paraphrasing needed)
-- Questions 8-10: Hard (detailed understanding, complex information)
-- For multiple_choice: Provide 4 options (A, B, C, D)
-- For fill_blank: Create natural sentence with one missing word/phrase
-- Base ALL questions on actual content from the transcript
-- Make questions progressive in difficulty
-- Use authentic IELTS question formats
+QUESTION TYPE SPECIFICATIONS:
+- multiple_choice: Create 4 realistic options with ONLY ONE correct answer from transcript
+- fill_blank: Use words/phrases/numbers that are clearly spoken in the audio
 
-Return JSON:
+ANSWER REQUIREMENTS:
+- All answers must be directly extractable from the transcript
+- For fill_blank: Use exact words/numbers from transcript (max 3 words)
+- For multiple_choice: Correct option must match transcript information exactly
+
+Return JSON format:
 {
   "sectionTitle": "Appropriate title for ${sectionDescription}",
   "instructions": "Listen to the ${sectionNum === 1 ? 'conversation' : sectionNum === 2 || sectionNum === 4 ? 'talk' : 'discussion'} and answer Questions ${(sectionNum-1)*10 + 1}-${sectionNum*10}. Write NO MORE THAN THREE WORDS AND/OR A NUMBER for each answer.",
   "questions": [
     {
       "questionType": "${questionTypes[0]}",
-      "question": "Question text based on transcript",
+      "question": "Question based on specific transcript content",
       "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"], // only for multiple_choice
-      "correctAnswer": "Exact answer from transcript",
+      "correctAnswer": "Exact word/phrase from transcript",
       "orderIndex": 1
     }
-    // ... continue for all 10 questions using the specified question types
+    // Continue for all 10 questions, ensuring each tests different transcript content
   ]
 }`;
         console.log("Generating AI content for section", sectionNum);

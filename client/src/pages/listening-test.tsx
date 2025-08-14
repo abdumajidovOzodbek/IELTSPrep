@@ -71,11 +71,11 @@ export default function ListeningTest() {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
 
     // Auto-save answer with proper validation
-    if (sessionId && questionId && answer) {
+    if (sessionId && questionId && answer && answer.toString().trim() !== '') {
       submitAnswerMutation.mutate({
         sessionId: sessionId,
         questionId: questionId,
-        answer: answer,
+        answer: answer.toString().trim(),
         section: "listening",
         timeSpent: 30 // Placeholder time
       });
@@ -234,71 +234,67 @@ export default function ListeningTest() {
 
             {/* Questions Panel - Show all questions in current section */}
             {activeQuestions.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Questions List - Left Panel */}
-                <div className="lg:col-span-2 space-y-4">
+              <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+                {/* Questions List - Main Panel */}
+                <div className="xl:col-span-3 space-y-4">
                   <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
                     <div className="mb-6">
                       <h3 className="text-xl font-semibold text-slate-900">
                         Questions {currentSection * 10 + 1}-{currentSection * 10 + activeQuestions.length}
                       </h3>
                       <p className="text-slate-600 mt-1">
-                        Answer all questions based on what you hear in the audio
+                        Answer all questions based on what you hear in the audio. You can answer in any order.
                       </p>
                     </div>
 
                     {/* Display all questions in current section */}
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                       {activeQuestions.map((question: any, index: number) => (
                         <div 
                           key={question._id || index}
-                          className={`p-4 border rounded-lg transition-colors ${
-                            index === currentQuestion 
-                              ? 'border-primary bg-primary/5' 
-                              : 'border-slate-200 hover:border-slate-300'
-                          }`}
+                          className="p-4 border rounded-lg hover:border-slate-300 transition-colors"
                         >
-                          <div className="flex items-start space-x-3">
-                            <div className="flex-shrink-0 w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center text-sm font-medium">
+                          <div className="flex items-start space-x-4">
+                            <div className="flex-shrink-0 w-8 h-8 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-sm font-medium">
                               {currentSection * 10 + index + 1}
                             </div>
                             <div className="flex-1 space-y-3">
-                              <div className="text-slate-800 font-medium">
+                              <div className="text-slate-800 font-medium leading-relaxed">
                                 {question?.content?.question || question?.question}
                               </div>
 
                               {/* Multiple Choice Options */}
                               {question?.content?.options && Array.isArray(question.content.options) && (
-                                <div className="grid grid-cols-1 gap-2">
+                                <div className="space-y-2">
                                   {question.content.options.map((option: string, optIndex: number) => (
-                                    <label key={optIndex} className="flex items-center space-x-3 cursor-pointer p-2 rounded hover:bg-slate-50 transition-colors">
+                                    <label key={optIndex} className="flex items-start space-x-3 cursor-pointer p-3 rounded-md hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200">
                                       <input
                                         type="radio"
                                         name={`question-${question._id}`}
                                         value={option}
                                         checked={answers[question._id] === option}
                                         onChange={(e) => handleAnswerChange(question._id, e.target.value)}
-                                        className="w-4 h-4 text-primary border-slate-300 focus:ring-primary"
+                                        className="w-4 h-4 text-primary border-slate-300 focus:ring-primary mt-0.5"
                                       />
-                                      <span className="text-slate-700 text-sm">{option}</span>
+                                      <span className="text-slate-700 leading-relaxed">{option}</span>
                                     </label>
                                   ))}
                                 </div>
                               )}
 
                               {/* Fill in the blank */}
-                              {!question?.content?.options && question?.questionType === 'fill_blank' && (
-                                <div className="max-w-sm">
+                              {(!question?.content?.options || question?.content?.options?.length === 0) && (
+                                <div className="max-w-md">
                                   <input
                                     type="text"
-                                    placeholder="Your answer..."
+                                    placeholder="Type your answer here..."
                                     value={answers[question._id] || ''}
                                     onChange={(e) => handleAnswerChange(question._id, e.target.value)}
-                                    className="w-full p-3 border border-slate-300 rounded-lg focus:ring-primary focus:border-primary"
+                                    className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
                                     maxLength={50}
                                   />
-                                  <p className="text-xs text-slate-500 mt-1">
-                                    Write no more than three words and/or a number
+                                  <p className="text-xs text-slate-500 mt-2">
+                                    Write no more than THREE WORDS and/or A NUMBER
                                   </p>
                                 </div>
                               )}
@@ -322,14 +318,15 @@ export default function ListeningTest() {
                 <div className="space-y-4">
                   {/* Section Progress */}
                   <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
-                    <h4 className="font-semibold text-slate-900 mb-3">Section Progress</h4>
+                    <h4 className="font-semibold text-slate-900 mb-3">Test Progress</h4>
                     <div className="space-y-3">
-                      {allSections.map((_, index) => {
-                        const sectionAnswered = activeQuestions.filter(q => answers[q._id]).length;
+                      {allSections.map((section, index) => {
+                        const sectionQuestions = section?.questions || [];
+                        const sectionAnswered = sectionQuestions.filter((q: any) => answers[q._id]).length;
                         const isCurrentSection = index === currentSection;
                         return (
-                          <div key={index} className={`p-3 rounded-lg border ${isCurrentSection ? 'border-primary bg-primary/5' : 'border-slate-200'}`}>
-                            <div className="flex items-center justify-between">
+                          <div key={index} className={`p-3 rounded-lg border transition-all ${isCurrentSection ? 'border-primary bg-primary/5' : 'border-slate-200'}`}>
+                            <div className="flex items-center justify-between mb-2">
                               <span className={`font-medium ${isCurrentSection ? 'text-primary' : 'text-slate-700'}`}>
                                 Section {index + 1}
                               </span>
@@ -342,20 +339,18 @@ export default function ListeningTest() {
                                 {isCurrentSection ? 'Current' : 'Go to'}
                               </Button>
                             </div>
-                            {isCurrentSection && (
-                              <div className="mt-2">
-                                <div className="flex justify-between text-xs text-slate-600 mb-1">
-                                  <span>Progress</span>
-                                  <span>{sectionAnswered}/{activeQuestions.length}</span>
-                                </div>
-                                <div className="w-full bg-slate-200 rounded-full h-2">
-                                  <div 
-                                    className="bg-primary h-2 rounded-full transition-all"
-                                    style={{ width: `${(sectionAnswered / activeQuestions.length) * 100}%` }}
-                                  ></div>
-                                </div>
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-xs text-slate-600">
+                                <span>Questions</span>
+                                <span>{sectionAnswered}/{sectionQuestions.length}</span>
                               </div>
-                            )}
+                              <div className="w-full bg-slate-200 rounded-full h-2">
+                                <div 
+                                  className="bg-primary h-2 rounded-full transition-all"
+                                  style={{ width: `${sectionQuestions.length > 0 ? (sectionAnswered / sectionQuestions.length) * 100 : 0}%` }}
+                                ></div>
+                              </div>
+                            </div>
                           </div>
                         );
                       })}
