@@ -975,7 +975,11 @@ QUALITY CHECKLIST:
 - Language matches authentic IELTS Academic style`;
 
         console.log(`Generating AI content for reading passage ${passageNum}`);
-        const aiResponse = await openaiService.generateText(contentGenerationPrompt);
+        const aiResponse = await openaiService.generateText(contentGenerationPrompt, {
+          maxTokens: 3000,
+          temperature: 0.3, // Lower temperature for more consistent IELTS questions
+          maxRetries: 5 // More retries for bulk operation
+        });
         
         if (!aiResponse.success) {
           console.error(`AI content generation failed for passage ${passageNum}:`, aiResponse.error);
@@ -984,7 +988,9 @@ QUALITY CHECKLIST:
 
         let generatedContent;
         try {
-          generatedContent = JSON.parse(aiResponse.data || "{}");
+          // Extract the text from the response structure
+          const responseText = aiResponse.data?.text || aiResponse.data || "";
+          generatedContent = JSON.parse(responseText);
         } catch (parseError) {
           console.error(`Failed to parse AI response for passage ${passageNum}:`, aiResponse.data);
           throw new Error(`Failed to parse AI response for passage ${passageNum}`);

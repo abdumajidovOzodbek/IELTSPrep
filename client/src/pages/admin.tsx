@@ -420,9 +420,12 @@ export default function AdminDashboard() {
       }
       
     } catch (error: any) {
+      const isAIOverload = error.message?.includes("overloaded") || error.message?.includes("503");
       toast({
-        title: "Upload Failed",
-        description: error.message || "Failed to create complete reading test",
+        title: isAIOverload ? "AI Service Temporarily Overloaded" : "Upload Failed",
+        description: isAIOverload 
+          ? "The AI service is busy. Please try again in a few minutes, or upload passages individually using the single passage upload below."
+          : error.message || "Failed to create complete reading test",
         variant: "destructive",
       });
     } finally {
@@ -1129,13 +1132,20 @@ export default function AdminDashboard() {
                             </div>
                           </div>
 
-                          <Button
-                            onClick={handleCreateCompleteReadingTest}
-                            disabled={!newTestData.title || isUploading}
-                            className="w-full bg-blue-600 hover:bg-blue-700"
-                          >
-                            {isUploading ? "Creating Test & Generating Questions..." : "Create Complete Reading Test"}
-                          </Button>
+                          <div className="space-y-3">
+                            <Button
+                              onClick={handleCreateCompleteReadingTest}
+                              disabled={!newTestData.title || isUploading}
+                              className="w-full bg-blue-600 hover:bg-blue-700"
+                            >
+                              {isUploading ? "Creating Test & Generating Questions..." : "Create Complete Reading Test"}
+                            </Button>
+                            
+                            <div className="text-xs text-center text-slate-500">
+                              <p>If AI service is overloaded, you can create a test above and add passages individually.</p>
+                              <p>Each passage takes ~30-60 seconds to process with AI question generation.</p>
+                            </div>
+                          </div>
                         </div>
                       </DialogContent>
                     </Dialog>

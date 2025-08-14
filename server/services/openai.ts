@@ -66,29 +66,51 @@ export class GeminiService {
     };
   }
 
-  async generateText(prompt: string, options?: { maxTokens?: number; temperature?: number }): Promise<AIResponse<{ text: string }>> {
+  async generateText(prompt: string, options?: { maxTokens?: number; temperature?: number; maxRetries?: number }): Promise<AIResponse<{ text: string }>> {
     if (!this.checkApiKey()) {
       return { success: false, error: 'Gemini API key not configured' };
     }
 
-    try {
-      const result = await this.model.generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          maxOutputTokens: options?.maxTokens || 1000,
-          temperature: options?.temperature || 0.7,
-        },
-      });
+    const maxRetries = options?.maxRetries || 3;
+    let lastError: any;
 
-      const response = await result.response;
-      return {
-        success: true,
-        data: { text: response.text() || '' },
-        rawResponse: response
-      };
-    } catch (error) {
-      return this.handleError(error);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Gemini API attempt ${attempt}/${maxRetries}`);
+        
+        const result = await this.model.generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            maxOutputTokens: options?.maxTokens || 2000,
+            temperature: options?.temperature || 0.7,
+          },
+        });
+
+        const response = await result.response;
+        console.log(`Gemini API successful on attempt ${attempt}`);
+        return {
+          success: true,
+          data: { text: response.text() || '' },
+          rawResponse: response
+        };
+      } catch (error: any) {
+        lastError = error;
+        console.error(`Gemini AI Error (attempt ${attempt}):`, error);
+        
+        // If it's a rate limit or overload error, wait before retrying
+        if ((error.status === 503 || error.status === 429) && attempt < maxRetries) {
+          const waitTime = Math.pow(2, attempt - 1) * 2000; // Exponential backoff starting at 2s
+          console.log(`Service overloaded, waiting ${waitTime}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+        
+        // For other errors or final attempt, break
+        break;
+      }
     }
+
+    return this.handleError(lastError);
   }
 
   async evaluateWriting(prompt: string, candidateText: string): Promise<AIResponse<WritingEvaluationResult>> {
