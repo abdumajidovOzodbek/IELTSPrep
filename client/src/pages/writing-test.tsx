@@ -90,7 +90,7 @@ export default function WritingTest() {
       <div className="flex flex-1">
         <TestNavigation currentSection="writing" sessionId={sessionId} />
         
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-6 ml-64">
           <div className="max-w-6xl mx-auto space-y-6">
             {/* Task Selection */}
             <div className="flex items-center justify-center space-x-4 mb-6">

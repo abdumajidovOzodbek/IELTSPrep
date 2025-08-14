@@ -295,7 +295,7 @@ export default function ListeningTestPage() {
                                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
                                   <div className="mb-3">
                                     <h5 className="text-sm font-semibold text-blue-900 mb-2">
-                                      {question.formContext?.formTitle || "Application Form"}
+                                      {question.formContext?.fieldLabel || question.formContext?.formTitle || "Application Form"}
                                     </h5>
                                   </div>
 
