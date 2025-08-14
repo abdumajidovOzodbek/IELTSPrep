@@ -171,13 +171,7 @@ export default function WritingTest() {
     </div>;
   }
 
-  // If the session is already in the speaking section, redirect
-  if (session.currentSection === "speaking" || session.currentSection === "reading") {
-    // The useEffect above should handle this, but as a safeguard:
-    if (session.currentSection === "speaking") window.location.href = `/test/${sessionId}/speaking`;
-    if (session.currentSection === "reading") window.location.href = `/test/${sessionId}/reading`;
-    return null; // Prevent rendering anything if redirecting
-  }
+  
 
 
   return (

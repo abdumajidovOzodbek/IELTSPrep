@@ -88,7 +88,7 @@ export default function ReadingTest() {
       const unansweredQuestions = allPassages.flatMap(passage => 
         passage.questions?.filter((q: any) => !answers[q._id]) || []
       );
-      
+
       // Auto-submit blank answers for unanswered questions
       unansweredQuestions.forEach((question: any) => {
         submitAnswerMutation.mutate({
@@ -141,7 +141,7 @@ export default function ReadingTest() {
     </div>;
   }
 
-  
+
 
   // Use structured test data - sort passages by passageNumber
   const allPassages = (testData?.passages || []).sort((a: any, b: any) => a.passageNumber - b.passageNumber);

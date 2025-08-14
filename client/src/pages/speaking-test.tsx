@@ -88,7 +88,7 @@ export default function SpeakingTest() {
         });
       }
     }
-    
+
     // Logic to move to the next section (or complete the test)
     // This part needs to be more dynamic based on the actual test structure
     // For now, let's assume speaking is the last part or we are moving to a hypothetical 'next' section
@@ -98,12 +98,6 @@ export default function SpeakingTest() {
     });
     window.location.href = `/results/${sessionId}`; // Redirect to results
   };
-
-  if (!session) {
-    return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-    </div>;
-  }
 
   // Route protection: redirect if user tries to access wrong section
   useEffect(() => {
