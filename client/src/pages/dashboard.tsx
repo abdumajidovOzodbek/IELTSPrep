@@ -38,11 +38,13 @@ export default function Dashboard() {
       return response.json();
     },
     onSuccess: (session) => {
+      console.log("Session created:", session);
       toast({
         title: "Test session created",
         description: "Starting your IELTS test now...",
       });
-      setLocation(`/listening/${session.id}`);
+      // Use _id from MongoDB instead of id
+      setLocation(`/listening/${session._id}`);
     },
     onError: (error) => {
       toast({
