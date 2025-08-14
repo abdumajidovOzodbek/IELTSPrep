@@ -276,7 +276,7 @@ Return JSON format:
               formContext: qData.formContext // Include form context for form_completion questions
             },
             correctAnswers: Array.isArray(qData.correctAnswer) ?
-            qData.correctAnswer.map(ans => typeof ans === 'object' ? JSON.stringify(ans) : String(ans)) :
+            qData.correctAnswer.map((ans: any) => typeof ans === 'object' ? JSON.stringify(ans) : String(ans)) :
             [typeof qData.correctAnswer === 'object' ? JSON.stringify(qData.correctAnswer) : String(qData.correctAnswer)],
             orderIndex: qData.orderIndex,
             audioFileId: audioFile._id!,
@@ -895,8 +895,8 @@ Return a JSON array with this format:
         const passageNum = passageIndex + 1;
 
         // Define question types and difficulty for each passage
-        let questionTypes: string[];
-        let passageDescription: string;
+        let questionTypes: string[] = [];
+        let passageDescription: string = "";
         
         switch(passageNum) {
           case 1:
@@ -1251,8 +1251,8 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
       for (const qData of questions) {
         try {
           console.log("Saving question:", qData.question?.substring(0, 100));
-          const questionSchema = {
-            section: "reading",
+          const questionSchema = insertTestQuestionSchema.parse({
+            section: "reading" as const,
             questionType: qData.questionType,
             content: {
               question: qData.question,
@@ -1262,10 +1262,10 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
               qData.correctAnswer.map((ans: any) => String(ans)) :
               [String(qData.correctAnswer)],
             orderIndex: qData.orderIndex,
-            passageId: savedPassage._id!,
-            generatedBy: "ai",
+            passage: savedPassage._id!.toString(),
+            generatedBy: "ai" as const,
             isActive: true
-          };
+          });
           const savedQuestion = await storage.createTestQuestion(questionSchema);
           savedQuestions.push(savedQuestion);
           console.log("Successfully saved question ID:", savedQuestion._id);
