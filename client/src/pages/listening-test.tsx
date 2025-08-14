@@ -232,94 +232,178 @@ export default function ListeningTest() {
               </div>
             )}
 
+            {/* Questions Panel - Show all questions in current section */}
             {activeQuestions.length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-slate-900">
-                    Question {currentSection * 10 + currentQuestion + 1} of 40
-                  </h3>
-                  <div className="text-sm text-slate-600 mt-1">
-                    Section {currentSection + 1}, Question {currentQuestion + 1} of {activeQuestions.length}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Questions List - Left Panel */}
+                <div className="lg:col-span-2 space-y-4">
+                  <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+                    <div className="mb-6">
+                      <h3 className="text-xl font-semibold text-slate-900">
+                        Questions {currentSection * 10 + 1}-{currentSection * 10 + activeQuestions.length}
+                      </h3>
+                      <p className="text-slate-600 mt-1">
+                        Answer all questions based on what you hear in the audio
+                      </p>
+                    </div>
+
+                    {/* Display all questions in current section */}
+                    <div className="space-y-6">
+                      {activeQuestions.map((question: any, index: number) => (
+                        <div 
+                          key={question._id || index}
+                          className={`p-4 border rounded-lg transition-colors ${
+                            index === currentQuestion 
+                              ? 'border-primary bg-primary/5' 
+                              : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-start space-x-3">
+                            <div className="flex-shrink-0 w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center text-sm font-medium">
+                              {currentSection * 10 + index + 1}
+                            </div>
+                            <div className="flex-1 space-y-3">
+                              <div className="text-slate-800 font-medium">
+                                {question?.content?.question || question?.question}
+                              </div>
+
+                              {/* Multiple Choice Options */}
+                              {question?.content?.options && Array.isArray(question.content.options) && (
+                                <div className="grid grid-cols-1 gap-2">
+                                  {question.content.options.map((option: string, optIndex: number) => (
+                                    <label key={optIndex} className="flex items-center space-x-3 cursor-pointer p-2 rounded hover:bg-slate-50 transition-colors">
+                                      <input
+                                        type="radio"
+                                        name={`question-${question._id}`}
+                                        value={option}
+                                        checked={answers[question._id] === option}
+                                        onChange={(e) => handleAnswerChange(question._id, e.target.value)}
+                                        className="w-4 h-4 text-primary border-slate-300 focus:ring-primary"
+                                      />
+                                      <span className="text-slate-700 text-sm">{option}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Fill in the blank */}
+                              {!question?.content?.options && question?.questionType === 'fill_blank' && (
+                                <div className="max-w-sm">
+                                  <input
+                                    type="text"
+                                    placeholder="Your answer..."
+                                    value={answers[question._id] || ''}
+                                    onChange={(e) => handleAnswerChange(question._id, e.target.value)}
+                                    className="w-full p-3 border border-slate-300 rounded-lg focus:ring-primary focus:border-primary"
+                                    maxLength={50}
+                                  />
+                                  <p className="text-xs text-slate-500 mt-1">
+                                    Write no more than three words and/or a number
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Answer Status */}
+                              {answers[question._id] && (
+                                <div className="flex items-center space-x-2 text-sm">
+                                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                  <span className="text-green-600 font-medium">Answered</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
+                {/* Progress Panel - Right Sidebar */}
                 <div className="space-y-4">
-                  <div className="text-slate-800 text-lg leading-relaxed">
-                    {activeQuestions[currentQuestion]?.content?.question || activeQuestions[currentQuestion]?.question}
+                  {/* Section Progress */}
+                  <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+                    <h4 className="font-semibold text-slate-900 mb-3">Section Progress</h4>
+                    <div className="space-y-3">
+                      {allSections.map((_, index) => {
+                        const sectionAnswered = activeQuestions.filter(q => answers[q._id]).length;
+                        const isCurrentSection = index === currentSection;
+                        return (
+                          <div key={index} className={`p-3 rounded-lg border ${isCurrentSection ? 'border-primary bg-primary/5' : 'border-slate-200'}`}>
+                            <div className="flex items-center justify-between">
+                              <span className={`font-medium ${isCurrentSection ? 'text-primary' : 'text-slate-700'}`}>
+                                Section {index + 1}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => goToSection(index)}
+                                className="text-xs"
+                              >
+                                {isCurrentSection ? 'Current' : 'Go to'}
+                              </Button>
+                            </div>
+                            {isCurrentSection && (
+                              <div className="mt-2">
+                                <div className="flex justify-between text-xs text-slate-600 mb-1">
+                                  <span>Progress</span>
+                                  <span>{sectionAnswered}/{activeQuestions.length}</span>
+                                </div>
+                                <div className="w-full bg-slate-200 rounded-full h-2">
+                                  <div 
+                                    className="bg-primary h-2 rounded-full transition-all"
+                                    style={{ width: `${(sectionAnswered / activeQuestions.length) * 100}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
 
-                  {activeQuestions[currentQuestion]?.content?.options && Array.isArray(activeQuestions[currentQuestion].content.options) && (
-                    <div className="space-y-3">
-                      {activeQuestions[currentQuestion].content.options.map((option: string, index: number) => (
-                        <label key={index} className="flex items-center space-x-3 cursor-pointer p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
-                          <input
-                            type="radio"
-                            name={`question-${currentSection}-${currentQuestion}`}
-                            value={option}
-                            checked={answers[activeQuestions[currentQuestion]?._id] === option}
-                            onChange={(e) => handleAnswerChange(activeQuestions[currentQuestion]?._id, e.target.value)}
-                            className="w-4 h-4 text-primary border-slate-300 focus:ring-primary"
-                          />
-                          <span className="text-slate-700 flex-1">{option}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-
-                  {!activeQuestions[currentQuestion]?.content?.options && activeQuestions[currentQuestion]?.questionType === 'fill_blank' && (
+                  {/* Navigation Controls */}
+                  <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+                    <h4 className="font-semibold text-slate-900 mb-3">Navigation</h4>
                     <div className="space-y-2">
-                      <input
-                        type="text"
-                        placeholder="Type your answer here..."
-                        value={answers[activeQuestions[currentQuestion]?._id] || ''}
-                        onChange={(e) => handleAnswerChange(activeQuestions[currentQuestion]?._id, e.target.value)}
-                        className="w-full p-4 text-lg border border-slate-300 rounded-lg focus:ring-primary focus:border-primary"
-                        data-testid="input-answer"
-                      />
+                      <Button
+                        onClick={handlePrevious}
+                        disabled={currentSection === 0}
+                        variant="outline"
+                        className="w-full flex items-center justify-center"
+                      >
+                        <ChevronLeft className="h-4 w-4 mr-2" />
+                        Previous Section
+                      </Button>
+                      
+                      <Button
+                        onClick={handleNext}
+                        className="w-full flex items-center justify-center"
+                        disabled={currentSection === allSections.length - 1}
+                      >
+                        {currentSection === allSections.length - 1 ? "Complete Test" : "Next Section"}
+                        <ChevronRight className="h-4 w-4 ml-2" />
+                      </Button>
                     </div>
-                  )}
+                  </div>
 
-                  {/* Enhanced Navigation */}
-                  <div className="flex justify-between items-center pt-6 border-t border-slate-200">
-                    <Button
-                      onClick={handlePrevious}
-                      disabled={currentQuestion === 0 && currentSection === 0}
-                      variant="outline"
-                      className="flex items-center"
-                      data-testid="button-previous"
-                    >
-                      <ChevronLeft className="h-4 w-4 mr-2" />
-                      Previous
-                    </Button>
-
-                    {/* Question navigation dots */}
-                    <div className="flex gap-1">
-                      {activeQuestions.slice(0, Math.min(10, activeQuestions.length)).map((_, index) => (
-                        <Button
-                          key={index}
-                          variant={index === currentQuestion ? "default" : "outline"}
-                          size="sm"
-                          className="w-8 h-8 p-0 text-xs"
-                          onClick={() => setCurrentQuestion(index)}
-                          data-testid={`button-question-${index + 1}`}
-                        >
-                          {currentSection * 10 + index + 1}
-                        </Button>
-                      ))}
+                  {/* Quick Stats */}
+                  <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+                    <h4 className="font-semibold text-slate-900 mb-3">Quick Stats</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Total Questions:</span>
+                        <span className="font-medium">40</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Current Section:</span>
+                        <span className="font-medium">{currentSection + 1} of 4</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Section Questions:</span>
+                        <span className="font-medium">{activeQuestions.length}</span>
+                      </div>
                     </div>
-
-                    <Button
-                      onClick={handleNext}
-                      className="flex items-center"
-                      data-testid="button-next"
-                    >
-                      {currentQuestion === activeQuestions.length - 1 && currentSection === allSections.length - 1
-                        ? "Complete Test"
-                        : currentQuestion === activeQuestions.length - 1
-                        ? "Next Section"
-                        : "Next"}
-                      <ChevronRight className="h-4 w-4 ml-2" />
-                    </Button>
                   </div>
                 </div>
               </div>

@@ -147,61 +147,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Read audio file and transcribe
         const audioFilePath = req.file.path;
         const audioBuffer = fs.readFileSync(audioFilePath);
-        
+
         const transcriptionResult = await openaiService.transcribeAudio(audioBuffer);
         if (!transcriptionResult.success) {
           throw new Error(`Transcription failed: ${transcriptionResult.error}`);
         }
         const transcript = transcriptionResult.data?.text || "";
 
-        // Generate section title and instructions
-        const contentGenerationPrompt = `Based on the following transcript, generate a concise and engaging title for this listening section and clear instructions for the user on how to answer the questions. Also, generate 5 IELTS-style listening questions of varying types (multiple choice, fill-in-the-blank, matching, map/diagram labeling).
+        // Generate section title and instructions with appropriate difficulty
+        let sectionDescription = "";
+        let questionTypes = [];
+
+        switch(sectionNum) {
+          case 1:
+            sectionDescription = "Section 1 - Social/Everyday Context (2 speakers, telephone conversation, form completion, basic information)";
+            questionTypes = ["multiple_choice", "fill_blank", "multiple_choice", "fill_blank", "multiple_choice", "fill_blank", "multiple_choice", "fill_blank", "multiple_choice", "fill_blank"];
+            break;
+          case 2:
+            sectionDescription = "Section 2 - Social Context (1 speaker, monologue about local facilities, services, events)";
+            questionTypes = ["multiple_choice", "multiple_choice", "fill_blank", "fill_blank", "multiple_choice", "fill_blank", "multiple_choice", "fill_blank", "multiple_choice", "fill_blank"];
+            break;
+          case 3:
+            sectionDescription = "Section 3 - Educational/Training Context (2-4 speakers, academic discussion, seminar, tutorial)";
+            questionTypes = ["multiple_choice", "multiple_choice", "multiple_choice", "fill_blank", "fill_blank", "multiple_choice", "fill_blank", "multiple_choice", "fill_blank", "multiple_choice"];
+            break;
+          case 4:
+            sectionDescription = "Section 4 - Academic Context (1 speaker, academic lecture, complex topic)";
+            questionTypes = ["fill_blank", "fill_blank", "fill_blank", "multiple_choice", "multiple_choice", "fill_blank", "fill_blank", "multiple_choice", "fill_blank", "fill_blank"];
+            break;
+        }
+
+        const contentGenerationPrompt = `You are an IELTS test developer. Based on the following transcript, create exactly 10 IELTS listening questions for ${sectionDescription}.
+
+IMPORTANT: Generate EXACTLY 10 questions, no more, no less. Each question must be based on specific information mentioned in the transcript.
 
 Transcript: "${transcript}"
 
-Return a JSON object with the following structure:
+Question Types to Use (in order): ${questionTypes.join(", ")}
+
+Guidelines:
+- Questions 1-3: Easy (basic information, clear answers)
+- Questions 4-7: Medium (inference, paraphrasing needed)
+- Questions 8-10: Hard (detailed understanding, complex information)
+- For multiple_choice: Provide 4 options (A, B, C, D)
+- For fill_blank: Create natural sentence with one missing word/phrase
+- Base ALL questions on actual content from the transcript
+- Make questions progressive in difficulty
+- Use authentic IELTS question formats
+
+Return JSON:
 {
-  "sectionTitle": "Generated Title",
-  "instructions": "Generated Instructions",
+  "sectionTitle": "Appropriate title for ${sectionDescription}",
+  "instructions": "Listen to the ${sectionNum === 1 ? 'conversation' : sectionNum === 2 || sectionNum === 4 ? 'talk' : 'discussion'} and answer Questions ${(sectionNum-1)*10 + 1}-${sectionNum*10}. Write NO MORE THAN THREE WORDS AND/OR A NUMBER for each answer.",
   "questions": [
     {
-      "questionType": "multiple_choice",
-      "question": "Question text",
-      "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"],
-      "correctAnswer": "B",
+      "questionType": "${questionTypes[0]}",
+      "question": "Question text based on transcript",
+      "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"], // only for multiple_choice
+      "correctAnswer": "Exact answer from transcript",
       "orderIndex": 1
-    },
-    {
-      "questionType": "fill_blank",
-      "question": "Fill in the blank: The meeting will be held on _______.",
-      "correctAnswer": "Tuesday",
-      "orderIndex": 2
-    },
-    {
-      "questionType": "matching",
-      "question": "Match the following speakers to their roles:",
-      "options": {
-        "Speaker 1": "Student",
-        "Speaker 2": "Professor",
-        "Speaker 3": "Librarian"
-      },
-      "correctAnswer": {"Speaker 1": "Student", "Speaker 2": "Professor", "Speaker 3": "Librarian"},
-      "orderIndex": 3
-    },
-    {
-      "questionType": "map_labeling",
-      "question": "Label the rooms on the map:",
-      "options": {
-        "Room 101": "Lecture Hall",
-        "Room 102": "Study Area",
-        "Room 103": "Cafeteria"
-      },
-      "correctAnswer": {"Room 101": "Lecture Hall", "Room 102": "Study Area", "Room 103": "Cafeteria"},
-      "orderIndex": 4
     }
+    // ... continue for all 10 questions using the specified question types
   ]
-}
-`;
+}`;
         console.log("Generating AI content for section", sectionNum);
         const aiResponse = await openaiService.generateText(contentGenerationPrompt);
         if (!aiResponse.success) {
@@ -212,7 +220,7 @@ Return a JSON object with the following structure:
         let generatedContent;
         try {
           console.log("AI Response:", aiResponse.data?.text?.substring(0, 500));
-          
+
           // Clean the AI response - remove markdown code blocks if present
           let cleanedResponse = aiResponse.data!.text;
           if (cleanedResponse.startsWith('```json')) {
@@ -220,7 +228,7 @@ Return a JSON object with the following structure:
           } else if (cleanedResponse.startsWith('```')) {
             cleanedResponse = cleanedResponse.replace(/```\s*/, '').replace(/\s*```\s*$/, '');
           }
-          
+
           generatedContent = JSON.parse(cleanedResponse);
           sectionTitle = generatedContent.sectionTitle;
           instructions = generatedContent.instructions;
@@ -259,8 +267,8 @@ Return a JSON object with the following structure:
               question: qData.question,
               options: qData.options
             },
-            correctAnswers: Array.isArray(qData.correctAnswer) ? 
-            qData.correctAnswer.map(ans => typeof ans === 'object' ? JSON.stringify(ans) : String(ans)) : 
+            correctAnswers: Array.isArray(qData.correctAnswer) ?
+            qData.correctAnswer.map(ans => typeof ans === 'object' ? JSON.stringify(ans) : String(ans)) :
             [typeof qData.correctAnswer === 'object' ? JSON.stringify(qData.correctAnswer) : String(qData.correctAnswer)],
             orderIndex: qData.orderIndex,
             audioFileId: audioFile._id!,
@@ -284,16 +292,16 @@ Return a JSON object with the following structure:
       // Update test with section reference and mark as active if all 4 sections are complete
       const existingSections = await storage.getTestSections(testId);
       console.log("Existing sections count:", existingSections.length, "Current section:", sectionNum);
-      
+
       // Check if we have all 4 unique sections (1, 2, 3, 4)
       const sectionNumbers = new Set(existingSections.map(s => s.sectionNumber));
       const isTestComplete = sectionNumbers.size === 4;
-      
+
       await storage.updateListeningTest(testId, {
         sections: existingSections.map(s => s._id!),
         status: isTestComplete ? "active" : "draft"
       });
-      
+
       console.log("Section numbers:", Array.from(sectionNumbers), "Test marked as:", isTestComplete ? "active" : "draft");
 
       res.json({
@@ -321,10 +329,10 @@ Return a JSON object with the following structure:
     try {
       const { testId } = req.params;
       const updateData = req.body;
-      
+
       console.log("PATCH request received for test", testId, "with data:", updateData);
       const updated = await storage.updateListeningTest(testId, updateData);
-      
+
       if (updated) {
         const updatedTest = await storage.getListeningTest(testId);
         console.log("Test updated successfully:", updatedTest?.status);
