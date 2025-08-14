@@ -156,7 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Generate section title and instructions with appropriate difficulty
         let sectionDescription = "";
-        let questionTypes = [];
+        let questionTypes: string[] = [];
 
         switch(sectionNum) {
           case 1:
@@ -315,7 +315,7 @@ Return ONLY valid JSON:
             questionType: questionType,
             content: questionContent,
             correctAnswers: Array.isArray(qData.correctAnswer) ?
-              qData.correctAnswer.map(ans => typeof ans === 'object' ? JSON.stringify(ans) : String(ans)) :
+              qData.correctAnswer.map((ans: any) => typeof ans === 'object' ? JSON.stringify(ans) : String(ans)) :
               [typeof qData.correctAnswer === 'object' ? JSON.stringify(qData.correctAnswer) : String(qData.correctAnswer)],
             orderIndex: qData.orderIndex,
             audioFileId: audioFile._id!,
@@ -782,6 +782,37 @@ Return a JSON array with this format:
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // AI Listening Content Generation endpoint
+  app.post("/api/ai/listening/generate", aiRateLimit, async (req, res) => {
+    try {
+      console.log("AI listening generation requested");
+      const { sessionId, difficulty = "intermediate" } = req.body;
+
+      // Generate complete listening test using AI
+      const aiResponse = await openaiService.generateListeningContent();
+
+      if (!aiResponse.success) {
+        console.error("AI generation failed:", aiResponse.error);
+        return res.status(500).json({ 
+          error: aiResponse.error,
+          fallback: true 
+        });
+      }
+
+      console.log("AI generation successful, returning content");
+      res.json({
+        success: true,
+        ...aiResponse.data
+      });
+    } catch (error: any) {
+      console.error("AI listening generation error:", error);
+      res.status(500).json({ 
+        error: error.message,
+        fallback: true 
+      });
     }
   });
 
