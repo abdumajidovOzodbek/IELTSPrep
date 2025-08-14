@@ -9,6 +9,10 @@ export function useTestSession(sessionId?: string) {
 
   const { data: session, isLoading, error } = useQuery({
     queryKey: [`/api/sessions/${sessionId}`],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/sessions/${sessionId}`);
+      return response.json();
+    },
     enabled: !!sessionId,
     refetchInterval: 30000, // Refetch every 30 seconds to keep session updated
     staleTime: 10000, // Consider data stale after 10 seconds
