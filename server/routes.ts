@@ -156,7 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Generate section title and instructions with appropriate difficulty
         let sectionDescription = "";
-        let questionTypes = [];
+        let questionTypes: string[] = [];
 
         switch(sectionNum) {
           case 1:
@@ -852,6 +852,221 @@ Return a JSON array with this format:
     }
   });
 
+  // Create complete reading test with 3 passages and AI-generated questions
+  app.post("/api/admin/reading-tests/bulk", aiRateLimit, async (req, res) => {
+    try {
+      const { passages, ...testData } = req.body;
+
+      if (!passages || passages.length !== 3) {
+        return res.status(400).json({ error: "Exactly 3 passages are required" });
+      }
+
+      // Validate each passage
+      for (let i = 0; i < 3; i++) {
+        const passage = passages[i];
+        if (!passage.title || !passage.content) {
+          return res.status(400).json({ error: `Passage ${i + 1} is missing title or content` });
+        }
+        if (passage.content.length < 300) {
+          return res.status(400).json({ error: `Passage ${i + 1} is too short (minimum 300 characters)` });
+        }
+      }
+
+      // Create the reading test
+      const test = await storage.createReadingTest({
+        ...testData,
+        createdBy: "admin",
+        passages: [],
+        testType: testData.testType || "academic"
+      });
+
+      const savedPassages = [];
+      let totalQuestions = 0;
+
+      // Process each passage and generate questions
+      for (let passageIndex = 0; passageIndex < 3; passageIndex++) {
+        const passageData = passages[passageIndex];
+        const passageNum = passageIndex + 1;
+
+        // Define question types and difficulty for each passage
+        let questionTypes: string[];
+        let passageDescription: string;
+        
+        switch(passageNum) {
+          case 1:
+            questionTypes = ["multiple_choice", "multiple_choice", "multiple_choice", "fill_blank", "fill_blank", "multiple_choice", "fill_blank", "multiple_choice", "fill_blank", "multiple_choice", "fill_blank", "multiple_choice", "fill_blank"];
+            passageDescription = "Passage 1 - General interest topic with moderate difficulty, focusing on main ideas and supporting details";
+            break;
+          case 2:
+            questionTypes = ["matching", "matching", "matching", "fill_blank", "fill_blank", "short_answer", "short_answer", "multiple_choice", "multiple_choice", "fill_blank", "fill_blank", "matching", "short_answer"];
+            passageDescription = "Passage 2 - Work/education topic with increased complexity, testing detailed comprehension and inference";
+            break;
+          case 3:
+            questionTypes = ["multiple_choice", "multiple_choice", "fill_blank", "fill_blank", "fill_blank", "multiple_choice", "matching", "matching", "short_answer", "short_answer", "multiple_choice", "fill_blank", "fill_blank", "multiple_choice"];
+            passageDescription = "Passage 3 - Academic/scientific topic with highest difficulty, testing complex reasoning and synthesis";
+            break;
+        }
+
+        const contentGenerationPrompt = `You are an expert IELTS Academic reading test developer. Create exactly ${questionTypes.length} authentic IELTS questions for ${passageDescription}.
+
+PASSAGE TO ANALYZE:
+Title: "${passageData.title}"
+Content: "${passageData.content}"
+
+PASSAGE ${passageNum} REQUIREMENTS:
+${passageNum === 1 ? `
+- General interest topic with moderate difficulty
+- Question types: multiple choice (4 options), true/false/not given, fill in blanks
+- Test main ideas, supporting details, and vocabulary in context
+- Questions should be clearly answerable from the passage
+` : passageNum === 2 ? `
+- Work or education-related topic with increased complexity
+- Question types: matching information, summary completion, short answer questions
+- Focus on detailed comprehension, inference, and connecting information
+- Test ability to locate specific information and understand relationships
+` : `
+- Academic/scientific topic with highest difficulty
+- Question types: multiple choice, yes/no/not given, matching features, completion tasks
+- Test complex reasoning, synthesis, and academic vocabulary
+- Require deep understanding of complex concepts and relationships
+`}
+
+CRITICAL INSTRUCTIONS:
+1. Analyze the passage carefully to identify key information, main ideas, supporting details, and relationships
+2. Generate exactly ${questionTypes.length} questions using these types in order: ${questionTypes.join(", ")}
+3. Each question MUST be answerable from the passage content
+4. Use authentic IELTS Academic question formats and language
+5. Questions should progress from easier to more challenging within the passage
+6. Ensure variety in what aspects of the passage are tested
+
+QUESTION TYPE SPECIFICATIONS:
+- multiple_choice: Create 4 realistic options (A, B, C, D) with only ONE correct answer from passage
+- fill_blank: Use exact words/phrases from passage (maximum 3 words per blank)
+- short_answer: Require specific information from passage (maximum 3 words)
+- matching: Match headings, information, or features to appropriate sections/paragraphs
+
+ANSWER REQUIREMENTS:
+- All answers must be directly extractable from the passage text
+- For fill_blank/short_answer: Use exact words from passage, respecting word limits
+- For multiple_choice: Correct option must match passage information exactly
+- For matching: Ensure clear correspondence between items and passage sections
+
+Return JSON format:
+{
+  "instructions": "Read the passage and answer Questions ${(passageNum-1)*13 + 1}-${passageNum*13 + (passageNum === 3 ? 1 : 0)}. Choose the correct letter A, B, C, or D for multiple choice questions. Write NO MORE THAN THREE WORDS for fill-in-the-blank questions.",
+  "questions": [
+    {
+      "questionType": "${questionTypes[0]}",
+      "question": "Clear question based on specific passage content",
+      "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"], // only for multiple_choice
+      "correctAnswer": "Exact answer from passage",
+      "orderIndex": 1,
+      "explanation": "Brief explanation of why this is correct"
+    }
+    // Continue for all ${questionTypes.length} questions
+  ]
+}
+
+QUALITY CHECKLIST:
+- Each question tests different parts of the passage
+- Questions range from factual recall to inference and analysis
+- All answers can be clearly found in or deduced from the passage
+- Question difficulty appropriate for passage position in test
+- Language matches authentic IELTS Academic style`;
+
+        console.log(`Generating AI content for reading passage ${passageNum}`);
+        const aiResponse = await openaiService.generateText(contentGenerationPrompt);
+        
+        if (!aiResponse.success) {
+          console.error(`AI content generation failed for passage ${passageNum}:`, aiResponse.error);
+          throw new Error(`AI content generation failed for passage ${passageNum}: ${aiResponse.error}`);
+        }
+
+        let generatedContent;
+        try {
+          generatedContent = JSON.parse(aiResponse.data || "{}");
+        } catch (parseError) {
+          console.error(`Failed to parse AI response for passage ${passageNum}:`, aiResponse.data);
+          throw new Error(`Failed to parse AI response for passage ${passageNum}`);
+        }
+
+        // Create the passage
+        const savedPassage = await storage.createReadingPassage({
+          testId: test._id!,
+          passageNumber: passageNum,
+          title: passageData.title,
+          passage: passageData.content,
+          instructions: generatedContent.instructions || `Read the passage and answer Questions ${(passageNum-1)*13 + 1}-${passageNum*13 + (passageNum === 3 ? 1 : 0)}.`,
+          questions: []
+        });
+
+        // Save generated questions
+        const savedQuestions = [];
+        const questions = generatedContent.questions || [];
+        
+        for (const qData of questions) {
+          try {
+            console.log(`Saving question for passage ${passageNum}:`, qData.question?.substring(0, 100));
+            const questionSchema = {
+              section: "reading" as const,
+              questionType: qData.questionType,
+              content: {
+                question: qData.question,
+                options: qData.options
+              },
+              correctAnswers: Array.isArray(qData.correctAnswer) ?
+                qData.correctAnswer.map((ans: any) => String(ans)) :
+                [String(qData.correctAnswer)],
+              orderIndex: qData.orderIndex + (passageNum - 1) * 13, // Global question numbering
+              passageId: savedPassage._id!,
+              generatedBy: "ai" as const,
+              isActive: true
+            };
+            
+            const savedQuestion = await storage.createTestQuestion(questionSchema);
+            savedQuestions.push(savedQuestion);
+            console.log(`Successfully saved question ID: ${savedQuestion._id}`);
+          } catch (error) {
+            console.error(`Error saving question for passage ${passageNum}:`, error);
+          }
+        }
+
+        // Update passage with questions
+        await storage.updateReadingPassage(savedPassage._id!.toString(), {
+          questions: savedQuestions.map(q => q._id!)
+        });
+
+        savedPassages.push({
+          ...savedPassage,
+          questions: savedQuestions
+        });
+        
+        totalQuestions += savedQuestions.length;
+      }
+
+      // Mark test as active since all 3 passages are complete
+      await storage.updateReadingTest(test._id!.toString(), {
+        passages: savedPassages.map(p => p._id!),
+        status: "active"
+      });
+
+      console.log(`Complete reading test created with ${totalQuestions} questions across 3 passages`);
+
+      res.json({
+        message: "Complete reading test created successfully",
+        test: {
+          ...test,
+          passages: savedPassages
+        },
+        totalQuestions,
+        testComplete: true
+      });
+    } catch (error: any) {
+      console.error("Bulk reading test creation error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Get all reading tests
   app.get("/api/admin/reading-tests", async (req, res) => {
     try {
@@ -998,11 +1213,12 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
               options: qData.options
             },
             correctAnswers: Array.isArray(qData.correctAnswer) ?
-              qData.correctAnswer.map(ans => String(ans)) :
+              qData.correctAnswer.map((ans: any) => String(ans)) :
               [String(qData.correctAnswer)],
             orderIndex: qData.orderIndex,
             passageId: savedPassage._id!,
-            generatedBy: "ai"
+            generatedBy: "ai",
+            isActive: true
           };
           const savedQuestion = await storage.createTestQuestion(questionSchema);
           savedQuestions.push(savedQuestion);

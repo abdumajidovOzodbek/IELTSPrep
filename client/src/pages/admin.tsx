@@ -362,6 +362,74 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleCreateCompleteReadingTest = async () => {
+    try {
+      setIsUploading(true);
+      
+      // Validate that all 3 passages are filled
+      const passages: Array<{title: string, content: string}> = [];
+      for (let i = 1; i <= 3; i++) {
+        const titleInput = document.getElementById(`bulk-passage-${i}-title`) as HTMLInputElement;
+        const contentInput = document.getElementById(`bulk-passage-${i}-content`) as HTMLTextAreaElement;
+        
+        if (!titleInput?.value || !contentInput?.value) {
+          toast({
+            title: "Missing Passage",
+            description: `Please fill in both title and content for Passage ${i}`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        if (contentInput.value.length < 300) {
+          toast({
+            title: "Passage Too Short",
+            description: `Passage ${i} should be at least 300 words for authentic IELTS questions`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        passages.push({
+          title: titleInput.value,
+          content: contentInput.value
+        });
+      }
+      
+      // Create the reading test with all 3 passages
+      const response = await apiRequest("POST", "/api/admin/reading-tests/bulk", {
+        ...newTestData,
+        passages: passages
+      });
+      const result = await response.json();
+      
+      toast({
+        title: "Complete Reading Test Created!",
+        description: `Test created successfully with ${result.totalQuestions || 40} AI-generated questions across 3 passages.`,
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/reading-tests"] });
+      setNewTestData({ title: "", description: "", difficulty: "intermediate" });
+      
+      // Clear all form inputs
+      for (let i = 1; i <= 3; i++) {
+        const titleInput = document.getElementById(`bulk-passage-${i}-title`) as HTMLInputElement;
+        const contentInput = document.getElementById(`bulk-passage-${i}-content`) as HTMLTextAreaElement;
+        if (titleInput) titleInput.value = "";
+        if (contentInput) contentInput.value = "";
+      }
+      
+    } catch (error: any) {
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to create complete reading test",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
@@ -914,7 +982,164 @@ export default function AdminDashboard() {
               {/* Create New Reading Test */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Create New Reading Test</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Create New Reading Test</CardTitle>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button className="bg-blue-600 hover:bg-blue-700">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Complete Test (3 Passages)
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>Create Complete Reading Test</DialogTitle>
+                          <p className="text-sm text-slate-600">Upload all 3 passages at once - AI will generate authentic IELTS questions automatically</p>
+                        </DialogHeader>
+                        <div className="space-y-6">
+                          {/* Test Info */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="bulk-test-title">Test Title</Label>
+                              <Input
+                                id="bulk-test-title"
+                                placeholder="e.g., IELTS Academic Reading Practice Test 1"
+                                value={newTestData.title}
+                                onChange={(e) => setNewTestData(prev => ({ ...prev, title: e.target.value }))}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="bulk-test-difficulty">Difficulty</Label>
+                              <Select
+                                value={newTestData.difficulty}
+                                onValueChange={(value) => setNewTestData(prev => ({ ...prev, difficulty: value }))}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="beginner">Beginner</SelectItem>
+                                  <SelectItem value="intermediate">Intermediate</SelectItem>
+                                  <SelectItem value="advanced">Advanced</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label htmlFor="bulk-test-description">Description</Label>
+                            <Textarea
+                              id="bulk-test-description"
+                              placeholder="Complete IELTS Academic reading test with authentic question types..."
+                              value={newTestData.description}
+                              onChange={(e) => setNewTestData(prev => ({ ...prev, description: e.target.value }))}
+                            />
+                          </div>
+
+                          {/* 3 Passages */}
+                          <div className="space-y-6">
+                            <div className="text-center mb-4">
+                              <h3 className="font-semibold text-slate-900 mb-2">Upload 3 Reading Passages</h3>
+                              <p className="text-sm text-slate-600">
+                                AI will generate 13-14 authentic IELTS questions per passage with appropriate difficulty progression
+                              </p>
+                            </div>
+
+                            {[1, 2, 3].map((passageNum) => (
+                              <Card key={passageNum} className="p-4 border-2 border-dashed border-slate-200">
+                                <div className="flex items-center space-x-3 mb-4">
+                                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <span className="text-sm font-semibold text-blue-600">{passageNum}</span>
+                                  </div>
+                                  <div>
+                                    <h4 className="font-medium text-slate-800">Passage {passageNum}</h4>
+                                    <p className="text-xs text-slate-500">
+                                      {passageNum === 1 ? "Moderate difficulty - General interest topic" :
+                                       passageNum === 2 ? "Medium difficulty - Work/education topic" :
+                                       "High difficulty - Academic/scientific topic"}
+                                    </p>
+                                  </div>
+                                </div>
+                                
+                                <div className="space-y-3">
+                                  <div>
+                                    <Label htmlFor={`bulk-passage-${passageNum}-title`}>Passage Title</Label>
+                                    <Input
+                                      id={`bulk-passage-${passageNum}-title`}
+                                      placeholder={
+                                        passageNum === 1 ? "e.g., The Benefits of Urban Farming" :
+                                        passageNum === 2 ? "e.g., Modern Workplace Communication" :
+                                        "e.g., Climate Change and Biodiversity"
+                                      }
+                                    />
+                                  </div>
+                                  
+                                  <div>
+                                    <Label htmlFor={`bulk-passage-${passageNum}-content`}>Passage Content (800-1000 words)</Label>
+                                    <Textarea
+                                      id={`bulk-passage-${passageNum}-content`}
+                                      placeholder="Paste the complete reading passage here..."
+                                      className="min-h-32"
+                                    />
+                                  </div>
+                                </div>
+                              </Card>
+                            ))}
+                          </div>
+
+                          {/* AI Info Panel */}
+                          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                            <div className="flex items-start space-x-3">
+                              <Sparkles className="h-5 w-5 text-blue-600 mt-0.5" />
+                              <div className="text-sm text-blue-800">
+                                <p className="font-medium mb-2">AI will automatically generate authentic IELTS questions:</p>
+                                <div className="grid grid-cols-3 gap-4 text-xs">
+                                  <div>
+                                    <p className="font-medium text-blue-900">Passage 1 (13-14 Qs)</p>
+                                    <ul className="list-disc list-inside space-y-1 text-blue-700">
+                                      <li>Multiple Choice</li>
+                                      <li>True/False/Not Given</li>
+                                      <li>Matching Headings</li>
+                                      <li>Sentence Completion</li>
+                                    </ul>
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-blue-900">Passage 2 (13-14 Qs)</p>
+                                    <ul className="list-disc list-inside space-y-1 text-blue-700">
+                                      <li>Matching Information</li>
+                                      <li>Summary Completion</li>
+                                      <li>Short Answer Questions</li>
+                                      <li>Fill in the Blanks</li>
+                                    </ul>
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-blue-900">Passage 3 (13-14 Qs)</p>
+                                    <ul className="list-disc list-inside space-y-1 text-blue-700">
+                                      <li>Multiple Choice</li>
+                                      <li>Yes/No/Not Given</li>
+                                      <li>Matching Features</li>
+                                      <li>Diagram Completion</li>
+                                    </ul>
+                                  </div>
+                                </div>
+                                <p className="text-blue-700 mt-3 font-medium">
+                                  Total: ~40 questions following authentic IELTS Academic format
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <Button
+                            onClick={handleCreateCompleteReadingTest}
+                            disabled={!newTestData.title || isUploading}
+                            className="w-full bg-blue-600 hover:bg-blue-700"
+                          >
+                            {isUploading ? "Creating Test & Generating Questions..." : "Create Complete Reading Test"}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -958,7 +1183,7 @@ export default function AdminDashboard() {
                     disabled={!newTestData.title || createReadingTestMutation.isPending}
                     className="mt-4"
                   >
-                    {createReadingTestMutation.isPending ? "Creating..." : "Create Reading Test"}
+                    {createReadingTestMutation.isPending ? "Creating..." : "Create Reading Test (Individual Passages)"}
                   </Button>
                 </CardContent>
               </Card>
