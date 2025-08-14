@@ -8,7 +8,7 @@ import {
   type AiEvaluation, type InsertAiEvaluation,
   type AudioRecording, type InsertAudioRecording,
   type ListeningTest, type InsertListeningTest,
-  type ListeningSection
+  type ListeningSection, type InsertListeningSection
 } from "@shared/schema";
 
 export interface IStorage {
@@ -63,6 +63,7 @@ export interface IStorage {
   createListeningSection(data: InsertListeningSection): Promise<ListeningSection>;
   getListeningSection(id: string): Promise<ListeningSection | undefined>;
   getTestSections(testId: string): Promise<ListeningSection[]>;
+  updateListeningSection(id: string, updates: Partial<ListeningSection>): Promise<ListeningSection | undefined>;
 }
 
 export class MongoStorage implements IStorage {
@@ -358,6 +359,19 @@ export class MongoStorage implements IStorage {
       return sections.map(section => ({ ...section, _id: section._id } as ListeningSection));
     } catch (error) {
       return [];
+    }
+  }
+
+  async updateListeningSection(id: string, updates: Partial<ListeningSection>): Promise<ListeningSection | undefined> {
+    try {
+      const result = await this.db.collection('listeningSections').findOneAndUpdate(
+        { _id: new ObjectId(id) },
+        { $set: updates },
+        { returnDocument: 'after' }
+      );
+      return result ? { ...result, _id: result._id } as ListeningSection : undefined;
+    } catch (error) {
+      return undefined;
     }
   }
 }
