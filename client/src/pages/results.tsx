@@ -1,5 +1,6 @@
 import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,17 +19,39 @@ import {
 export default function Results() {
   const { sessionId } = useParams();
 
-  const { data: session } = useQuery({
+  const { data: session, isLoading: sessionLoading } = useQuery({
     queryKey: [`/api/sessions/${sessionId}`],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/sessions/${sessionId}`);
+      return response.json();
+    },
+    enabled: !!sessionId,
   });
 
-  const { data: evaluations = [] } = useQuery({
+  const { data: evaluations = [], isLoading: evaluationsLoading } = useQuery({
     queryKey: [`/api/sessions/${sessionId}/evaluations`],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/sessions/${sessionId}/evaluations`);
+      return response.json();
+    },
+    enabled: !!sessionId,
   });
+
+  if (sessionLoading || evaluationsLoading) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+        <p className="text-slate-600">Loading your results...</p>
+      </div>
+    </div>;
+  }
 
   if (!session) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="text-center text-red-600">
+        <p>Session not found</p>
+        <p>Session ID: {sessionId}</p>
+      </div>
     </div>;
   }
 
