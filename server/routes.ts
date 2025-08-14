@@ -951,19 +951,19 @@ ANSWER REQUIREMENTS:
 - For multiple_choice: Correct option must match passage information exactly
 - For matching: Ensure clear correspondence between items and passage sections
 
-Return JSON format:
+IMPORTANT: Return ONLY valid JSON without any markdown code blocks or extra formatting. Do not wrap in \`\`\`json\`\`\`.
+
 {
   "instructions": "Read the passage and answer Questions ${(passageNum-1)*13 + 1}-${passageNum*13 + (passageNum === 3 ? 1 : 0)}. Choose the correct letter A, B, C, or D for multiple choice questions. Write NO MORE THAN THREE WORDS for fill-in-the-blank questions.",
   "questions": [
     {
       "questionType": "${questionTypes[0]}",
       "question": "Clear question based on specific passage content",
-      "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"], // only for multiple_choice
+      "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"],
       "correctAnswer": "Exact answer from passage",
       "orderIndex": 1,
       "explanation": "Brief explanation of why this is correct"
     }
-    // Continue for all ${questionTypes.length} questions
   ]
 }
 
@@ -989,11 +989,45 @@ QUALITY CHECKLIST:
         let generatedContent;
         try {
           // Extract the text from the response structure
-          const responseText = aiResponse.data?.text || aiResponse.data || "";
-          generatedContent = JSON.parse(responseText);
+          let responseText = aiResponse.data?.text || aiResponse.data || "";
+          
+          // Remove markdown code blocks if present
+          if (typeof responseText === 'string') {
+            responseText = responseText.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
+            
+            // Try to extract JSON from the response
+            const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+            const jsonText = jsonMatch ? jsonMatch[0] : responseText;
+          
+            generatedContent = JSON.parse(jsonText);
+          } else {
+            generatedContent = responseText; // Assume it's already parsed
+          }
+          
+          // Validate that we have the required fields
+          if (!generatedContent.questions || !Array.isArray(generatedContent.questions)) {
+            throw new Error("AI response missing questions array");
+          }
+          
         } catch (parseError) {
-          console.error(`Failed to parse AI response for passage ${passageNum}:`, aiResponse.data);
-          throw new Error(`Failed to parse AI response for passage ${passageNum}`);
+          console.error(`Failed to parse AI response for passage ${passageNum}:`, parseError);
+          console.error(`Raw response:`, aiResponse.data);
+          
+          // Create fallback questions as a last resort
+          console.log(`Creating fallback questions for passage ${passageNum}`);
+          generatedContent = {
+            instructions: `Read the passage and answer Questions ${(passageNum-1)*13 + 1}-${passageNum*13}. Choose the correct letter A, B, C, or D for multiple choice questions.`,
+            questions: questionTypes.map((type, index) => ({
+              questionType: type,
+              question: `[AI Error] Please manually create question ${index + 1} of type ${type} based on the passage content.`,
+              options: type === 'multiple_choice' ? ['A) Option 1', 'B) Option 2', 'C) Option 3', 'D) Option 4'] : undefined,
+              correctAnswer: 'Manual review required',
+              orderIndex: index + 1,
+              explanation: 'This question needs manual review due to AI parsing error.'
+            }))
+          };
+          
+          console.log(`Created ${generatedContent.questions.length} fallback questions for passage ${passageNum}`);
         }
 
         // Create the passage

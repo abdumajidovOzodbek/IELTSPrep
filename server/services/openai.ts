@@ -83,6 +83,7 @@ export class GeminiService {
           generationConfig: {
             maxOutputTokens: options?.maxTokens || 2000,
             temperature: options?.temperature || 0.7,
+            responseMimeType: "application/json", // Request JSON response
           },
         });
 
