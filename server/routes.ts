@@ -308,7 +308,7 @@ Return a JSON object with the following structure:
           ...section,
           questions: savedQuestions
         },
-        testComplete: updatedSections.length === 4
+        testComplete: existingSections.length === 4
       });
     } catch (error: any) {
       console.error("Section audio upload error:", error);
