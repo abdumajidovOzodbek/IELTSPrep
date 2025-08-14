@@ -256,6 +256,91 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
       return this.handleError(error);
     }
   }
+
+  async generateAudio(text: string, voice: string = "alloy"): Promise<AIResponse<{ audioUrl: string; duration: number }>> {
+    if (!this.checkApiKey()) {
+      return { success: false, error: 'OpenAI API key not configured' };
+    }
+
+    try {
+      const response = await openai.audio.speech.create({
+        model: "tts-1",
+        voice: voice as any,
+        input: text,
+        response_format: "mp3",
+      });
+
+      // Convert response to buffer
+      const audioBuffer = Buffer.from(await response.arrayBuffer());
+      const audioUrl = `data:audio/mp3;base64,${audioBuffer.toString('base64')}`;
+      
+      // Estimate duration (rough calculation: ~150 words per minute for TTS)
+      const wordCount = text.split(' ').length;
+      const estimatedDuration = Math.max(10, Math.ceil((wordCount / 150) * 60));
+
+      return {
+        success: true,
+        data: { 
+          audioUrl,
+          duration: estimatedDuration
+        },
+        rawResponse: response
+      };
+    } catch (error: any) {
+      return this.handleError(error);
+    }
+  }
+
+  async generateListeningContent(): Promise<AIResponse<{ sections: Array<{ title: string; transcript: string; questions: any[] }> }>> {
+    if (!this.checkApiKey()) {
+      return { success: false, error: 'OpenAI API key not configured' };
+    }
+
+    try {
+      const prompt = `Generate complete IELTS Listening test content with 3 sections. Each section should have:
+      1. A realistic conversation or monologue transcript (2-3 minutes of spoken content)
+      2. 3-4 multiple choice questions based on the audio
+      3. Appropriate difficulty progression from section 1 to 3
+
+      Format as JSON with this structure:
+      {
+        "sections": [
+          {
+            "title": "Section 1 - Everyday Conversation",
+            "transcript": "Full transcript of conversation between Sarah and hotel receptionist discussing room booking...",
+            "questions": [
+              {
+                "id": "q1",
+                "question": "What is the main purpose of the call?",
+                "options": ["A) To book a hotel", "B) To cancel a reservation", "C) To make a complaint", "D) To ask for directions"],
+                "correct": "A"
+              }
+            ]
+          }
+        ]
+      }
+
+      Make the content realistic, engaging, and appropriate for IELTS Academic level. Include natural speech patterns and realistic scenarios.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        max_tokens: 3000,
+        temperature: 0.7,
+      });
+
+      const content = JSON.parse(response.choices[0].message.content || '{}');
+
+      return {
+        success: true,
+        data: content,
+        rawResponse: response
+      };
+    } catch (error: any) {
+      return this.handleError(error);
+    }
+  }
 }
 
 export const openaiService = new OpenAIService();

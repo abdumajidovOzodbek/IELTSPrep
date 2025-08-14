@@ -14,8 +14,16 @@ export default function ListeningTest() {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
 
+  // Generate AI listening content with audio
+  const { data: listeningContent, isLoading: isGenerating } = useQuery({
+    queryKey: ["/api/ai/listening/generate"],
+    staleTime: 300000, // Cache for 5 minutes
+    refetchOnWindowFocus: false,
+  });
+
   const { data: questions = [], isLoading } = useQuery({
     queryKey: ["/api/questions/listening"],
+    enabled: false, // Disable static questions, use AI-generated content
   });
 
   const submitAnswerMutation = useMutation({
@@ -40,8 +48,12 @@ export default function ListeningTest() {
     });
   };
 
+  // Use AI-generated content if available, otherwise fall back to static questions
+  const activeQuestions = listeningContent?.sections?.[0]?.questions || questions;
+  const audioUrl = listeningContent?.sections?.[0]?.audioUrl;
+  
   const handleNext = () => {
-    if (currentQuestion < questions.length - 1) {
+    if (currentQuestion < activeQuestions.length - 1) {
       setCurrentQuestion(prev => prev + 1);
     } else {
       // Move to next section
@@ -55,11 +67,13 @@ export default function ListeningTest() {
     }
   };
 
-  if (isLoading || !session) {
+  if (isGenerating || isLoading || !session) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-        <p className="text-slate-600">Loading test questions...</p>
+        <p className="text-slate-600">
+          {isGenerating ? "Generating AI-powered listening test with audio..." : "Loading test questions..."}
+        </p>
       </div>
     </div>;
   }
@@ -95,22 +109,75 @@ export default function ListeningTest() {
               </div>
             </div>
 
-            <AudioPlayer 
-              audioUrl={questions[0]?.audioUrl || "/audio/sample.mp3"}
-              isPlaying={false}
-              onPlayStateChange={() => {}}
-            />
+            {audioUrl ? (
+              <AudioPlayer 
+                audioUrl={audioUrl}
+                isPlaying={false}
+                onPlayStateChange={() => {}}
+                allowSeeking={false}
+              />
+            ) : (
+              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Audio Player</h3>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <p className="text-amber-800 text-sm">
+                    AI is generating your personalized listening test with high-quality audio. 
+                    This may take a moment...
+                  </p>
+                </div>
+              </div>
+            )}
 
-            <QuestionPanel
-              questions={questions}
-              currentQuestion={currentQuestion}
-              answers={answers}
-              onAnswerChange={handleAnswerChange}
-              onNext={handleNext}
-              onPrevious={handlePrevious}
-              canGoNext={currentQuestion < questions.length - 1}
-              canGoPrevious={currentQuestion > 0}
-            />
+            {activeQuestions.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+                <div className="mb-4">
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    Question {currentQuestion + 1} of {activeQuestions.length}
+                  </h3>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="text-slate-800">
+                    {activeQuestions[currentQuestion]?.question}
+                  </div>
+                  
+                  {activeQuestions[currentQuestion]?.options && (
+                    <div className="space-y-2">
+                      {activeQuestions[currentQuestion].options.map((option: string, index: number) => (
+                        <label key={index} className="flex items-center space-x-3 cursor-pointer">
+                          <input
+                            type="radio"
+                            name={`question-${currentQuestion}`}
+                            value={option}
+                            checked={answers[activeQuestions[currentQuestion]?.id] === option}
+                            onChange={(e) => handleAnswerChange(activeQuestions[currentQuestion]?.id, e.target.value)}
+                            className="w-4 h-4 text-primary border-slate-300 focus:ring-primary"
+                          />
+                          <span className="text-slate-700">{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between pt-4">
+                    <button
+                      onClick={handlePrevious}
+                      disabled={currentQuestion === 0}
+                      className="px-4 py-2 text-slate-600 bg-slate-100 rounded-md hover:bg-slate-200 disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    
+                    <button
+                      onClick={handleNext}
+                      className="px-6 py-2 bg-primary text-white rounded-md hover:bg-primary/90"
+                    >
+                      {currentQuestion < activeQuestions.length - 1 ? "Next Question" : "Complete Section"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </main>
       </div>

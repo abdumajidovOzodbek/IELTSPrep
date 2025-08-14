@@ -278,6 +278,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate AI-powered listening content with audio
+  app.post("/api/ai/listening/generate", aiRateLimit, async (req, res) => {
+    try {
+      // Generate listening content
+      const content = await openaiService.generateListeningContent();
+      
+      if (!content.success) {
+        return res.status(500).json({ error: content.error });
+      }
+
+      // Generate audio for each section
+      const sectionsWithAudio = [];
+      
+      for (const section of content.data!.sections) {
+        const audioResult = await openaiService.generateAudio(section.transcript, "nova");
+        
+        if (audioResult.success) {
+          sectionsWithAudio.push({
+            ...section,
+            audioUrl: audioResult.data!.audioUrl,
+            duration: audioResult.data!.duration
+          });
+        } else {
+          sectionsWithAudio.push({
+            ...section,
+            audioUrl: null,
+            duration: 0
+          });
+        }
+      }
+
+      res.json({ sections: sectionsWithAudio });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Generate audio for specific text
+  app.post("/api/ai/generate-audio", aiRateLimit, async (req, res) => {
+    try {
+      const { text, voice = "alloy" } = req.body;
+      
+      if (!text) {
+        return res.status(400).json({ error: "Text is required" });
+      }
+
+      const audioResult = await openaiService.generateAudio(text, voice);
+      
+      if (!audioResult.success) {
+        return res.status(500).json({ error: audioResult.error });
+      }
+
+      res.json(audioResult.data);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Audio recordings
   app.post("/api/recordings", upload.single("audio"), async (req, res) => {
     try {
