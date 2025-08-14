@@ -282,14 +282,16 @@ Return a JSON object with the following structure:
       const existingSections = await storage.getTestSections(testId);
       console.log("Existing sections count:", existingSections.length, "Current section:", sectionNum);
       
-      const isTestComplete = existingSections.length === 4;
+      // Check if we have all 4 unique sections (1, 2, 3, 4)
+      const sectionNumbers = new Set(existingSections.map(s => s.sectionNumber));
+      const isTestComplete = sectionNumbers.size === 4;
       
       await storage.updateListeningTest(testId, {
         sections: existingSections.map(s => s._id!),
         status: isTestComplete ? "active" : "draft"
       });
       
-      console.log("Test marked as:", isTestComplete ? "active" : "draft");
+      console.log("Section numbers:", Array.from(sectionNumbers), "Test marked as:", isTestComplete ? "active" : "draft");
 
       res.json({
         message: "Audio uploaded and content generated successfully for section",
@@ -308,6 +310,31 @@ Return a JSON object with the following structure:
     } catch (error: any) {
       console.error("Section audio upload error:", error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update listening test
+  app.patch("/api/admin/listening-tests/:testId", async (req, res) => {
+    try {
+      const { testId } = req.params;
+      const updateData = req.body;
+      
+      console.log("PATCH request received for test", testId, "with data:", updateData);
+      const updated = await storage.updateListeningTest(testId, updateData);
+      
+      if (updated) {
+        const updatedTest = await storage.getListeningTest(testId);
+        console.log("Test updated successfully:", updatedTest?.status);
+        res.setHeader('Content-Type', 'application/json');
+        return res.json(updatedTest);
+      } else {
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(404).json({ error: "Test not found" });
+      }
+    } catch (error: any) {
+      console.error("Error updating test:", error);
+      res.setHeader('Content-Type', 'application/json');
+      return res.status(500).json({ error: error.message });
     }
   });
 
@@ -502,8 +529,13 @@ Return a JSON array with this format:
 
       if (section === "listening") {
         // Get a random complete listening test
+        console.log("Looking for active listening tests...");
         const randomTest = await storage.getRandomListeningTest();
+        console.log("Found test:", randomTest ? randomTest.title : "none");
         if (!randomTest) {
+          // Debug: Check if there are any tests at all
+          const allTests = await storage.getAllListeningTests();
+          console.log("All tests:", allTests.map(t => ({ title: t.title, status: t.status })));
           return res.status(404).json({ error: "No complete listening tests available" });
         }
 
