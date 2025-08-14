@@ -42,7 +42,7 @@ export default function ReadingTest() {
   }, [session, sessionId]);
 
   // Get structured reading test data
-  const { data: testData, isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["/api/questions/reading"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/questions/reading");
@@ -141,17 +141,15 @@ export default function ReadingTest() {
     </div>;
   }
 
-
-
   // Use structured test data - sort passages by passageNumber
-  const allPassages = (testData?.passages || []).sort((a: any, b: any) => a.passageNumber - b.passageNumber);
+  const allPassages = (data?.passages || []).sort((a: any, b: any) => a.passageNumber - b.passageNumber);
   const currentPassageData = allPassages[currentPassage];
   const activeQuestions = currentPassageData?.questions || [];
   const currentQuestionData = activeQuestions[currentQuestion];
   const passageTitle = currentPassageData?.title || `Passage ${currentPassage + 1}`;
   const passageText = currentPassageData?.passage || currentPassageData?.text || "";
   const instructions = currentPassageData?.instructions || "Read the passage and answer the questions.";
-  const testTitle = testData?.testTitle || "Reading Test";
+  const testTitle = data?.testTitle || "Reading Test";
 
   console.log("Current passage:", currentPassage, "Total passages:", allPassages.length);
   console.log("Current passage data:", currentPassageData?.title);
