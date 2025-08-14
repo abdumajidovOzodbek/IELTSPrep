@@ -20,31 +20,15 @@ export default function ReadingTest() {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
 
-  // Generate AI reading content
-  const { data: aiContent, isLoading: isGenerating } = useQuery({
-    queryKey: ["/api/ai/reading/generate"],
-    queryFn: async () => {
-      const response = await apiRequest("POST", "/api/ai/reading/generate", {});
-      return response.json();
-    },
-    staleTime: 1000 * 60 * 60, // Cache for 1 hour
-    refetchOnWindowFocus: false,
-  });
-
-  const { data: questions = [], isLoading } = useQuery({
+  // Get structured reading test data
+  const { data: testData, isLoading } = useQuery({
     queryKey: ["/api/questions/reading"],
     queryFn: async () => {
-      try {
-        const response = await apiRequest("GET", "/api/questions/reading");
-        return await response.json();
-      } catch (error) {
-        console.warn("Failed to load reading questions, using AI content or fallback");
-        if (aiContent?.passages) {
-          return aiContent.passages;
-        }
-        return [];
-      }
+      const response = await apiRequest("GET", "/api/questions/reading");
+      return await response.json();
     },
+    staleTime: 1000 * 60 * 10, // Cache for 10 minutes
+    refetchOnWindowFocus: false,
   });
 
   const submitAnswerMutation = useMutation({
@@ -93,8 +77,8 @@ export default function ReadingTest() {
     }
   };
 
-  // Show loading if both AI content and fallback questions are loading
-  if (isGenerating && isLoading) {
+  // Show loading state
+  if (isLoading) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
@@ -112,14 +96,15 @@ export default function ReadingTest() {
     </div>;
   }
 
-  // Use AI-generated content or fallback questions
-  const allPassages = aiContent?.passages || questions || [];
+  // Use structured test data
+  const allPassages = testData?.passages || [];
   const currentPassageData = allPassages[currentPassage];
   const activeQuestions = currentPassageData?.questions || [];
   const currentQuestionData = activeQuestions[currentQuestion];
   const passageTitle = currentPassageData?.title || `Passage ${currentPassage + 1}`;
   const passageText = currentPassageData?.passage || currentPassageData?.text || "";
   const instructions = currentPassageData?.instructions || "Read the passage and answer the questions.";
+  const testTitle = testData?.testTitle || "Reading Test";
 
   const renderQuestion = () => {
     if (!currentQuestionData) {

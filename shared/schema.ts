@@ -129,6 +129,29 @@ export const audioRecordingSchema = z.object({
 // Insert schemas (for validation before DB insert)
 export const insertUserSchema = userSchema.omit({ _id: true, createdAt: true });
 export const insertTestSessionSchema = testSessionSchema.omit({ _id: true, startTime: true });
+export const insertListeningTestSchema = listeningTestSchema.omit({ _id: true, createdAt: true, updatedAt: true });
+
+export const insertListeningSectionSchema = listeningSectionSchema.omit({ _id: true, createdAt: true });
+
+export const insertReadingTestSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
+  status: z.enum(["draft", "active", "archived"]).default("draft"),
+  passages: z.array(z.any()).default([]),
+  createdBy: z.string(),
+  testType: z.enum(["academic", "general"]).default("academic"),
+});
+
+export const insertReadingPassageSchema = z.object({
+  testId: z.instanceof(ObjectId),
+  passageNumber: z.number().int().min(1).max(3),
+  title: z.string().min(1),
+  passage: z.string().min(100), // Minimum 100 characters for a passage
+  instructions: z.string().optional(),
+  questions: z.array(z.instanceof(ObjectId)).default([]),
+});
+
 export const insertTestQuestionSchema = testQuestionSchema.omit({ _id: true, createdAt: true });
 export const insertTestAnswerSchema = testAnswerSchema.omit({ _id: true, submittedAt: true });
 export const insertAiEvaluationSchema = aiEvaluationSchema.omit({ _id: true, evaluatedAt: true });
@@ -147,6 +170,11 @@ export type ListeningTest = z.infer<typeof listeningTestSchema>;
 export type InsertListeningTest = z.infer<typeof insertListeningTestSchema>;
 export type ListeningSection = z.infer<typeof listeningSectionSchema>;
 export type InsertListeningSection = z.infer<typeof insertListeningSectionSchema>;
+
+export type ReadingTest = z.infer<typeof insertReadingTestSchema>; // Added for Reading Test
+export type InsertReadingTest = z.infer<typeof insertReadingTestSchema>; // Added for Insert Reading Test
+export type ReadingPassage = z.infer<typeof insertReadingPassageSchema>; // Added for Reading Passage
+export type InsertReadingPassage = z.infer<typeof insertReadingPassageSchema>; // Added for Insert Reading Passage
 
 export type TestQuestion = z.infer<typeof testQuestionSchema>;
 export type InsertTestQuestion = z.infer<typeof insertTestQuestionSchema>;

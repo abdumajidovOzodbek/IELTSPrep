@@ -541,7 +541,7 @@ Return a JSON array with this format:
     }
   });
 
-  // Modified: Get listening questions with random structured test selection
+  // Modified: Get questions with random structured test selection
   app.get("/api/questions/:section", async (req, res) => {
     try {
       const section = TestSectionEnum.parse(req.params.section);
@@ -589,6 +589,54 @@ Return a JSON array with this format:
           testId: randomTest._id,
           testTitle: randomTest.title,
           sections: sectionsWithData
+        });
+      } else if (section === "reading") {
+        // Get a random complete reading test
+        console.log("Looking for active reading tests...");
+        const randomTest = await storage.getRandomReadingTest();
+        console.log("Found reading test:", randomTest ? randomTest.title : "none");
+        
+        if (!randomTest) {
+          // Fallback to AI generated content if no tests available
+          console.log("No reading tests found, using AI generation fallback");
+          const result = await openaiService.generateReadingContent();
+          
+          if (!result.success) {
+            return res.status(404).json({ error: "No reading tests available and AI generation failed" });
+          }
+          
+          return res.json({
+            testId: "ai-generated",
+            testTitle: "AI Generated Reading Test",
+            passages: result.data!.passages
+          });
+        }
+
+        // Get all passages for this test
+        const passages = await storage.getTestPassages(randomTest._id!.toString());
+
+        // Get questions for each passage
+        const passagesWithData = await Promise.all(
+          passages.map(async (passage) => {
+            const questions = await storage.getQuestionsByPassage(passage._id!.toString());
+
+            return {
+              passageNumber: passage.passageNumber,
+              title: passage.title,
+              passage: passage.passage,
+              instructions: passage.instructions,
+              questions: questions.map(q => ({
+                ...q,
+                passageNumber: passage.passageNumber
+              }))
+            };
+          })
+        );
+
+        res.json({
+          testId: randomTest._id,
+          testTitle: randomTest.title,
+          passages: passagesWithData
         });
       } else {
         const questions = await storage.getTestQuestions(section);
@@ -780,6 +828,253 @@ Return a JSON array with this format:
     } catch (error: any) {
       console.error("Error generating listening content:", error);
       res.status(500).json({ error: "Failed to generate listening content" });
+    }
+  });
+
+  // Create new reading test
+  app.post("/api/admin/reading-tests", async (req, res) => {
+    try {
+      const testData = {
+        ...req.body,
+        createdBy: "admin",
+        passages: [],
+        section: "reading",
+        testType: req.body.testType || "academic"
+      };
+
+      const test = await storage.createReadingTest(testData);
+      res.json({
+        message: "Reading test created successfully",
+        test
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get all reading tests
+  app.get("/api/admin/reading-tests", async (req, res) => {
+    try {
+      const tests = await storage.getAllReadingTests();
+      res.json(tests);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Upload passage content and generate questions
+  app.post("/api/admin/reading-tests/:testId/passages/:passageNumber", async (req, res) => {
+    try {
+      const { testId, passageNumber } = req.params;
+      const { title, passage, instructions } = req.body;
+
+      if (!passage || !title) {
+        return res.status(400).json({ error: "Title and passage content are required" });
+      }
+
+      const test = await storage.getReadingTest(testId);
+      if (!test) {
+        return res.status(404).json({ error: "Reading test not found" });
+      }
+
+      const passageNum = parseInt(passageNumber);
+      if (passageNum < 1 || passageNum > 3) {
+        return res.status(400).json({ error: "Passage number must be between 1 and 3" });
+      }
+
+      // Generate questions using AI based on passage content
+      const contentGenerationPrompt = `You are an expert IELTS reading test developer. Create exactly 13-14 authentic IELTS Academic reading questions for Passage ${passageNum}.
+
+PASSAGE TO ANALYZE:
+Title: "${title}"
+Content: "${passage}"
+
+PASSAGE ${passageNum} REQUIREMENTS:
+${passageNum === 1 ? `
+- General interest topic with moderate difficulty
+- Mix of question types: multiple choice (4 options), true/false/not given, matching headings, sentence completion
+- Questions should test main ideas, supporting details, and vocabulary in context
+` : passageNum === 2 ? `
+- Work or education-related topic with increased complexity
+- Question types: matching information, summary completion with word bank, short answer questions
+- Focus on detailed comprehension and inference skills
+` : `
+- Academic/scientific topic with highest difficulty
+- Question types: multiple choice, yes/no/not given, matching features, diagram/flowchart completion
+- Test complex reasoning, synthesis, and academic vocabulary
+`}
+
+CRITICAL INSTRUCTIONS:
+1. Analyze the passage carefully to identify key information, main ideas, supporting details
+2. Generate exactly ${passageNum === 1 ? '13' : passageNum === 2 ? '13' : '14'} questions
+3. Each question MUST be answerable from the passage content
+4. Use authentic IELTS question formats and language
+5. Questions should progress from easier to more challenging
+
+QUESTION TYPES TO INCLUDE:
+- Multiple Choice: 4 options (A, B, C, D) with only ONE correct answer
+- True/False/Not Given: Clear statements that can be verified from the passage
+- Fill in the blank: Use exact words from passage (max 3 words)
+- Matching: Match information, headings, or features appropriately
+
+Return JSON format:
+{
+  "passageTitle": "${title}",
+  "instructions": "Questions ${(passageNum-1)*13 + 1}-${passageNum*13}. Read Passage ${passageNum} and answer the questions below.",
+  "questions": [
+    {
+      "questionType": "multiple_choice",
+      "question": "According to the passage, the main cause of...",
+      "options": ["A) First option", "B) Second option", "C) Third option", "D) Fourth option"],
+      "correctAnswer": "A",
+      "orderIndex": 1
+    },
+    {
+      "questionType": "true_false",
+      "question": "The author suggests that modern technology has decreased workplace productivity.",
+      "correctAnswer": "FALSE",
+      "orderIndex": 2
+    },
+    {
+      "questionType": "fill_blank",
+      "question": "The research showed that _______ was the most significant factor.",
+      "correctAnswer": "employee satisfaction",
+      "orderIndex": 3
+    }
+  ]
+}
+
+Ensure all questions test different aspects of the passage and maintain IELTS Academic standards.`;
+
+      console.log(`Generating AI questions for passage ${passageNum}`);
+      const aiResponse = await openaiService.generateText(contentGenerationPrompt);
+      if (!aiResponse.success) {
+        console.error("AI question generation failed:", aiResponse.error);
+        throw new Error(`AI question generation failed: ${aiResponse.error}`);
+      }
+
+      let generatedContent;
+      try {
+        console.log("AI Response:", aiResponse.data?.text?.substring(0, 500));
+        let cleanedResponse = aiResponse.data!.text;
+        if (cleanedResponse.startsWith('```json')) {
+          cleanedResponse = cleanedResponse.replace(/```json\s*/, '').replace(/\s*```\s*$/, '');
+        } else if (cleanedResponse.startsWith('```')) {
+          cleanedResponse = cleanedResponse.replace(/```\s*/, '').replace(/\s*```\s*$/, '');
+        }
+
+        generatedContent = JSON.parse(cleanedResponse);
+        console.log("Generated questions count:", generatedContent.questions?.length || 0);
+      } catch (parseError) {
+        console.error("Failed to parse AI generated content:", parseError);
+        console.error("Raw AI response:", aiResponse.data?.text);
+        throw new Error("Failed to parse AI generated content.");
+      }
+
+      // Save passage and questions to database
+      const passageData = {
+        testId: new ObjectId(testId),
+        passageNumber: passageNum,
+        title: title,
+        passage: passage,
+        instructions: instructions || generatedContent.instructions,
+        questions: []
+      };
+
+      const savedPassage = await storage.createReadingPassage(passageData);
+
+      // Save generated questions
+      const savedQuestions = [];
+      const questions = generatedContent.questions || [];
+      
+      for (const qData of questions) {
+        try {
+          console.log("Saving question:", qData.question?.substring(0, 100));
+          const questionSchema = {
+            section: "reading",
+            questionType: qData.questionType,
+            content: {
+              question: qData.question,
+              options: qData.options
+            },
+            correctAnswers: Array.isArray(qData.correctAnswer) ?
+              qData.correctAnswer.map(ans => String(ans)) :
+              [String(qData.correctAnswer)],
+            orderIndex: qData.orderIndex,
+            passageId: savedPassage._id!,
+            generatedBy: "ai"
+          };
+          const savedQuestion = await storage.createTestQuestion(questionSchema);
+          savedQuestions.push(savedQuestion);
+          console.log("Successfully saved question ID:", savedQuestion._id);
+        } catch (error) {
+          console.error("Error saving question:", error);
+        }
+      }
+
+      // Update passage with questions
+      await storage.updateReadingPassage(savedPassage._id!.toString(), {
+        questions: savedQuestions.map(q => q._id!)
+      });
+
+      // Update test with passage reference and mark as active if all 3 passages are complete
+      const existingPassages = await storage.getTestPassages(testId);
+      console.log("Existing passages count:", existingPassages.length, "Current passage:", passageNum);
+
+      const passageNumbers = new Set(existingPassages.map(p => p.passageNumber));
+      const isTestComplete = passageNumbers.size === 3;
+
+      await storage.updateReadingTest(testId, {
+        passages: existingPassages.map(p => p._id!),
+        status: isTestComplete ? "active" : "draft"
+      });
+
+      console.log("Passage numbers:", Array.from(passageNumbers), "Test marked as:", isTestComplete ? "active" : "draft");
+
+      res.json({
+        message: "Passage uploaded and questions generated successfully",
+        passage: {
+          ...savedPassage,
+          questions: savedQuestions
+        },
+        testComplete: existingPassages.length === 3
+      });
+    } catch (error: any) {
+      console.error("Passage upload error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get test passages
+  app.get("/api/admin/reading-tests/:testId/passages", async (req, res) => {
+    try {
+      const { testId } = req.params;
+      const passages = await storage.getTestPassages(testId);
+      res.json(passages);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update reading test
+  app.patch("/api/admin/reading-tests/:testId", async (req, res) => {
+    try {
+      const { testId } = req.params;
+      const updateData = req.body;
+
+      console.log("PATCH request received for reading test", testId, "with data:", updateData);
+      const updated = await storage.updateReadingTest(testId, updateData);
+
+      if (updated) {
+        const updatedTest = await storage.getReadingTest(testId);
+        console.log("Reading test updated successfully:", updatedTest?.status);
+        res.json(updatedTest);
+      } else {
+        res.status(404).json({ error: "Reading test not found" });
+      }
+    } catch (error: any) {
+      console.error("Error updating reading test:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 

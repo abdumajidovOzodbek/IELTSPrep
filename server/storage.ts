@@ -11,6 +11,14 @@ import {
   type ListeningSection, type InsertListeningSection
 } from "@shared/schema";
 
+// Define new types for Reading Tests and Passages if they are not already defined in @shared/schema
+// For now, assuming they are not, and will use 'any' or define placeholder types.
+// In a real scenario, these should be properly defined in the schema.
+type ReadingTest = any;
+type InsertReadingTest = any;
+type ReadingPassage = any;
+type InsertReadingPassage = any;
+
 export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
@@ -64,6 +72,19 @@ export interface IStorage {
   getListeningSection(id: string): Promise<ListeningSection | undefined>;
   getTestSections(testId: string): Promise<ListeningSection[]>;
   updateListeningSection(id: string, updates: Partial<ListeningSection>): Promise<ListeningSection | undefined>;
+
+  // Reading Tests (New Methods)
+  createReadingTest(data: InsertReadingTest): Promise<ReadingTest>;
+  getReadingTest(id: string): Promise<ReadingTest | undefined>;
+  getAllReadingTests(): Promise<ReadingTest[]>;
+  updateReadingTest(id: string, updates: Partial<ReadingTest>): Promise<ReadingTest | undefined>;
+  getRandomReadingTest(): Promise<ReadingTest | undefined>;
+
+  // Reading Passages (New Methods)
+  createReadingPassage(data: InsertReadingPassage): Promise<ReadingPassage>;
+  getTestPassages(testId: string): Promise<ReadingPassage[]>;
+  updateReadingPassage(id: string, updates: Partial<ReadingPassage>): Promise<ReadingPassage | undefined>;
+  getQuestionsByPassage(passageId: string): Promise<TestQuestion[]>;
 }
 
 export class MongoStorage implements IStorage {
@@ -84,6 +105,16 @@ export class MongoStorage implements IStorage {
   async disconnect(): Promise<void> {
     await this.client.close();
   }
+
+  // Helper to get DB connection, though the original code directly uses this.db
+  // Keeping it for consistency with the provided change snippet, but note it's redundant if this.db is already initialized.
+  private async getConnection(): Promise<Db> {
+    if (!this.db) {
+      await this.connect(); // Ensure connection if somehow lost or not initialized
+    }
+    return this.db;
+  }
+
 
   // Users
   async getUser(id: string): Promise<User | undefined> {
@@ -372,6 +403,103 @@ export class MongoStorage implements IStorage {
       return result ? { ...result, _id: result._id } as ListeningSection : undefined;
     } catch (error) {
       return undefined;
+    }
+  }
+
+  // Reading Test methods
+  async createReadingTest(testData: InsertReadingTest): Promise<ReadingTest> {
+    const result = await this.db.collection('reading_tests').insertOne({
+      ...testData,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    return { ...testData, _id: result.insertedId, createdAt: new Date(), updatedAt: new Date() } as ReadingTest;
+  }
+
+  async getAllReadingTests(): Promise<ReadingTest[]> {
+    const tests = await this.db.collection('reading_tests').find({}).sort({ createdAt: -1 }).toArray();
+    return tests.map(test => ({ ...test, _id: test._id } as ReadingTest));
+  }
+
+  async getReadingTest(id: string): Promise<ReadingTest | undefined> {
+    try {
+      const test = await this.db.collection('reading_tests').findOne({ _id: new ObjectId(id) });
+      return test ? { ...test, _id: test._id } as ReadingTest : undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  async updateReadingTest(id: string, updates: Partial<ReadingTest>): Promise<ReadingTest | undefined> {
+    try {
+      const result = await this.db.collection('reading_tests').findOneAndUpdate(
+        { _id: new ObjectId(id) },
+        { $set: { ...updates, updatedAt: new Date() } },
+        { returnDocument: 'after' }
+      );
+      return result ? { ...result, _id: result._id } as ReadingTest : undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  async getRandomReadingTest(): Promise<ReadingTest | undefined> {
+    const pipeline = [
+      { $match: { status: "active" } },
+      { $sample: { size: 1 } }
+    ];
+    try {
+      const result = await this.db.collection('reading_tests').aggregate(pipeline).toArray();
+      return result.length > 0 ? { ...result[0], _id: result[0]._id } as ReadingTest : undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  // Reading Passage methods
+  async createReadingPassage(passageData: InsertReadingPassage): Promise<ReadingPassage> {
+    const result = await this.db.collection('reading_passages').insertOne({
+      ...passageData,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    return { ...passageData, _id: result.insertedId, createdAt: new Date(), updatedAt: new Date() } as ReadingPassage;
+  }
+
+  async getTestPassages(testId: string): Promise<ReadingPassage[]> {
+    try {
+      const passages = await this.db.collection('reading_passages')
+        .find({ testId: new ObjectId(testId) })
+        .sort({ passageNumber: 1 })
+        .toArray();
+      return passages.map(passage => ({ ...passage, _id: passage._id } as ReadingPassage));
+    } catch (error) {
+      return [];
+    }
+  }
+
+  async updateReadingPassage(id: string, updates: Partial<ReadingPassage>): Promise<ReadingPassage | undefined> {
+    try {
+      const result = await this.db.collection('reading_passages').findOneAndUpdate(
+        { _id: new ObjectId(id) },
+        { $set: { ...updates, updatedAt: new Date() } },
+        { returnDocument: 'after' }
+      );
+      return result ? { ...result, _id: result._id } as ReadingPassage : undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  async getQuestionsByPassage(passageId: string): Promise<TestQuestion[]> {
+    try {
+      const questions = await this.db.collection('test_questions')
+        .find({ passageId: new ObjectId(passageId) })
+        .sort({ orderIndex: 1 })
+        .toArray();
+      return questions.map(question => ({ ...question, _id: question._id } as TestQuestion));
+    } catch (error) {
+      return [];
     }
   }
 }

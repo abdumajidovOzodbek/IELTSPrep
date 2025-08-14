@@ -46,6 +46,12 @@ export default function AdminDashboard() {
     instructions: ""
   });
 
+  const [passageData, setPassageData] = useState({
+    title: "",
+    content: "",
+    instructions: ""
+  });
+
   const { data: stats } = useQuery<{ audioFiles?: number }>({
     queryKey: ["/api/admin/stats"],
   });
@@ -60,6 +66,10 @@ export default function AdminDashboard() {
 
   const { data: listeningTests = [] } = useQuery<any[]>({
     queryKey: ["/api/admin/listening-tests"],
+  });
+
+  const { data: readingTests = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/reading-tests"],
   });
 
   // Upload audio file mutation
@@ -183,6 +193,59 @@ export default function AdminDashboard() {
     onError: (error: any) => {
       toast({
         title: "Generation Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create reading test mutation
+  const createReadingTestMutation = useMutation({
+    mutationFn: async (testData: any) => {
+      const response = await apiRequest("POST", "/api/admin/reading-tests", testData);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Reading Test Created",
+        description: "Reading test created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/reading-tests"] });
+      setNewTestData({ title: "", description: "", difficulty: "intermediate" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Creation Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Upload passage mutation
+  const uploadPassageMutation = useMutation({
+    mutationFn: async ({ testId, passageNumber, title, passage, instructions }: any) => {
+      const response = await apiRequest("POST", `/api/admin/reading-tests/${testId}/passages/${passageNumber}`, {
+        title,
+        passage,
+        instructions
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Passage Added",
+        description: data.testComplete ? "All 3 passages completed! Test is now active." : `Passage ${data.passage.passageNumber} added successfully with ${data.passage.questions.length} questions`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/reading-tests"] });
+      setPassageData({ title: "", content: "", instructions: "" });
+      if (data.testComplete) {
+        setCurrentTest(null);
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Upload Failed",
         description: error.message,
         variant: "destructive",
       });
@@ -525,6 +588,7 @@ export default function AdminDashboard() {
           <TabsList>
             <TabsTrigger value="sessions">Test Sessions</TabsTrigger>
             <TabsTrigger value="listening-tests">Listening Tests</TabsTrigger>
+            <TabsTrigger value="reading-tests">Reading Tests</TabsTrigger>
             <TabsTrigger value="audio">Audio Management</TabsTrigger>
           </TabsList>
 
@@ -823,6 +887,227 @@ export default function AdminDashboard() {
                                           className="w-full"
                                         >
                                           {uploadSectionAudioMutation.isPending ? "Uploading..." : "Upload Section"}
+                                        </Button>
+                                      </div>
+                                    </DialogContent>
+                                  </Dialog>
+                                )}
+                                
+                                <Button variant="ghost" size="sm">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="reading-tests">
+            {/* Reading Tests Management */}
+            <div className="space-y-6">
+              {/* Create New Reading Test */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Create New Reading Test</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="reading-test-title">Test Title</Label>
+                      <Input
+                        id="reading-test-title"
+                        placeholder="e.g., IELTS Academic Reading Test 1"
+                        value={newTestData.title}
+                        onChange={(e) => setNewTestData(prev => ({ ...prev, title: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="reading-test-description">Description</Label>
+                      <Input
+                        id="reading-test-description"
+                        placeholder="Test description"
+                        value={newTestData.description}
+                        onChange={(e) => setNewTestData(prev => ({ ...prev, description: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="reading-difficulty">Difficulty</Label>
+                      <Select
+                        value={newTestData.difficulty}
+                        onValueChange={(value) => setNewTestData(prev => ({ ...prev, difficulty: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="beginner">Beginner</SelectItem>
+                          <SelectItem value="intermediate">Intermediate</SelectItem>
+                          <SelectItem value="advanced">Advanced</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => createReadingTestMutation.mutate(newTestData)}
+                    disabled={!newTestData.title || createReadingTestMutation.isPending}
+                    className="mt-4"
+                  >
+                    {createReadingTestMutation.isPending ? "Creating..." : "Create Reading Test"}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Existing Reading Tests */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Reading Tests</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {readingTests.length === 0 ? (
+                      <div className="text-center py-8">
+                        <ClipboardList className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                        <p className="text-slate-600">No reading tests created yet</p>
+                        <p className="text-sm text-slate-500">Create your first reading test above</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {readingTests.map((test: any) => (
+                          <Card key={test._id} className="hover:shadow-md transition-shadow">
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <h3 className="font-semibold text-slate-900">{test.title}</h3>
+                                <Badge
+                                  variant={test.status === 'active' ? 'default' : test.status === 'draft' ? 'secondary' : 'outline'}
+                                  className={
+                                    test.status === 'active' ? 'bg-green-100 text-green-800' :
+                                    test.status === 'draft' ? 'bg-yellow-100 text-yellow-800' : ''
+                                  }
+                                >
+                                  {test.status}
+                                </Badge>
+                              </div>
+                              
+                              {test.description && (
+                                <p className="text-sm text-slate-600 mb-3">{test.description}</p>
+                              )}
+
+                              <div className="flex items-center justify-between text-sm text-slate-500 mb-4">
+                                <span>Passages: {test.passages?.length || 0}/3</span>
+                                <span>{test.difficulty}</span>
+                              </div>
+
+                              <div className="grid grid-cols-3 gap-2 mb-4">
+                                {[1, 2, 3].map((passageNum) => {
+                                  const hasPassage = test.passages?.length >= passageNum;
+                                  return (
+                                    <div
+                                      key={passageNum}
+                                      className={`text-center p-2 rounded text-xs font-medium ${
+                                        hasPassage
+                                          ? 'bg-green-100 text-green-800'
+                                          : 'bg-slate-100 text-slate-500'
+                                      }`}
+                                    >
+                                      Passage {passageNum}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              <div className="flex space-x-2">
+                                {test.status === 'draft' && (
+                                  <Dialog>
+                                    <DialogTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentTest(test)}
+                                      >
+                                        <Upload className="h-4 w-4 mr-1" />
+                                        Add Passage
+                                      </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                                      <DialogHeader>
+                                        <DialogTitle>Add Reading Passage</DialogTitle>
+                                      </DialogHeader>
+                                      <div className="space-y-4">
+                                        <div>
+                                          <Label>Current Test: {test.title}</Label>
+                                          <p className="text-xs text-slate-500">
+                                            Next passage: {(test.passages?.length || 0) + 1}/3
+                                          </p>
+                                        </div>
+
+                                        <div>
+                                          <Label htmlFor="passage-title">Passage Title</Label>
+                                          <Input
+                                            id="passage-title"
+                                            placeholder={`The Impact of Technology on Education`}
+                                            value={passageData.title}
+                                            onChange={(e) => setPassageData(prev => ({ ...prev, title: e.target.value }))}
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <Label htmlFor="passage-content">Passage Content</Label>
+                                          <Textarea
+                                            id="passage-content"
+                                            placeholder="Paste the full reading passage here (800-1000 words)..."
+                                            value={passageData.content}
+                                            onChange={(e) => setPassageData(prev => ({ ...prev, content: e.target.value }))}
+                                            className="min-h-32"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <Label htmlFor="passage-instructions">Instructions (Optional)</Label>
+                                          <Textarea
+                                            id="passage-instructions"
+                                            placeholder="Questions 1-13. Read the passage and answer the questions below."
+                                            value={passageData.instructions}
+                                            onChange={(e) => setPassageData(prev => ({ ...prev, instructions: e.target.value }))}
+                                          />
+                                        </div>
+
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                          <div className="flex items-start space-x-2">
+                                            <Sparkles className="h-4 w-4 text-blue-600 mt-0.5" />
+                                            <div className="text-xs text-blue-700">
+                                              <p className="font-medium mb-1">AI will automatically generate:</p>
+                                              <ul className="list-disc list-inside space-y-0.5 text-blue-600">
+                                                <li>13-14 IELTS-style questions per passage</li>
+                                                <li>Mixed question types (multiple choice, T/F/NG, fill-in-blank)</li>
+                                                <li>Appropriate difficulty for passage number</li>
+                                                <li>Answer keys for automatic grading</li>
+                                              </ul>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <Button
+                                          onClick={() => {
+                                            if (passageData.content && passageData.title && currentTest) {
+                                              uploadPassageMutation.mutate({
+                                                testId: currentTest._id,
+                                                passageNumber: (currentTest.passages?.length || 0) + 1,
+                                                title: passageData.title,
+                                                passage: passageData.content,
+                                                instructions: passageData.instructions || `Questions ${((currentTest.passages?.length || 0) + 1 - 1)*13 + 1}-${((currentTest.passages?.length || 0) + 1)*13}. Read the passage and answer the questions below.`
+                                              });
+                                            }
+                                          }}
+                                          disabled={!passageData.content || !passageData.title || !currentTest || uploadPassageMutation.isPending}
+                                          className="w-full"
+                                        >
+                                          {uploadPassageMutation.isPending ? "Generating Questions..." : "Add Passage & Generate Questions"}
                                         </Button>
                                       </div>
                                     </DialogContent>
