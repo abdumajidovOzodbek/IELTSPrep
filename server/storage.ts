@@ -493,12 +493,31 @@ export class MongoStorage implements IStorage {
 
   async getQuestionsByPassage(passageId: string): Promise<TestQuestion[]> {
     try {
-      const questions = await this.db.collection('test_questions')
-        .find({ passageId: new ObjectId(passageId) })
+      console.log("Searching for questions with passageId:", passageId);
+      
+      // Try both string and ObjectId formats to be safe
+      const questions = await this.db.collection('testQuestions')
+        .find({ 
+          $or: [
+            { passageId: new ObjectId(passageId) },
+            { passageId: passageId }
+          ]
+        })
         .sort({ orderIndex: 1 })
         .toArray();
+        
+      console.log("Found questions:", questions.length);
+      if (questions.length > 0) {
+        console.log("First question:", {
+          id: questions[0]._id,
+          question: questions[0].content?.question?.substring(0, 50),
+          passageId: questions[0].passageId
+        });
+      }
+      
       return questions.map(question => ({ ...question, _id: question._id } as TestQuestion));
     } catch (error) {
+      console.error("Error in getQuestionsByPassage:", error);
       return [];
     }
   }

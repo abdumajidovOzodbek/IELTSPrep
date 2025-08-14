@@ -16,10 +16,15 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/dashboard" component={Dashboard} />
       <Route path="/listening/:sessionId" component={ListeningTest} />
       <Route path="/reading/:sessionId" component={ReadingTest} />
       <Route path="/writing/:sessionId" component={WritingTest} />
       <Route path="/speaking/:sessionId" component={SpeakingTest} />
+      <Route path="/test/:sessionId/listening" component={ListeningTest} />
+      <Route path="/test/:sessionId/reading" component={ReadingTest} />
+      <Route path="/test/:sessionId/writing" component={WritingTest} />
+      <Route path="/test/:sessionId/speaking" component={SpeakingTest} />
       <Route path="/results/:sessionId" component={Results} />
       <Route path="/admin" component={AdminDashboard} />
       <Route component={NotFound} />

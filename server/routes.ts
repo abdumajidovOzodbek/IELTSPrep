@@ -614,11 +614,17 @@ Return a JSON array with this format:
 
         // Get all passages for this test
         const passages = await storage.getTestPassages(randomTest._id!.toString());
+        console.log("Found passages:", passages.length);
+        passages.forEach(p => {
+          console.log("Passage:", p.passageNumber, "ID:", p._id?.toString(), "Title:", p.title);
+        });
 
         // Get questions for each passage
         const passagesWithData = await Promise.all(
           passages.map(async (passage) => {
+            console.log("Fetching questions for passage ID:", passage._id!.toString());
             const questions = await storage.getQuestionsByPassage(passage._id!.toString());
+            console.log("Found questions for passage:", questions.length);
 
             return {
               passageNumber: passage.passageNumber,
