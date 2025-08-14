@@ -1,132 +1,128 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, jsonb, timestamp, integer, boolean, real } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
+
 import { z } from "zod";
+import { ObjectId } from "mongodb";
 
-// Users table
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  email: text("email").notNull().unique(),
-  password: text("password").notNull(),
-  role: text("role").notNull().default("student"), // student, admin, examiner
-  createdAt: timestamp("created_at").defaultNow(),
+// User schema
+export const userSchema = z.object({
+  _id: z.instanceof(ObjectId).optional(),
+  username: z.string().min(3),
+  email: z.string().email(),
+  password: z.string().min(6),
+  role: z.enum(["student", "admin", "examiner"]).default("student"),
+  createdAt: z.date().default(() => new Date()),
 });
 
-// Test sessions
-export const testSessions = pgTable("test_sessions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull(),
-  testType: text("test_type").notNull(), // academic, general
-  status: text("status").notNull().default("in_progress"), // in_progress, completed, paused
-  currentSection: text("current_section").default("listening"), // listening, reading, writing, speaking
-  startTime: timestamp("start_time").defaultNow(),
-  endTime: timestamp("end_time"),
-  timeRemaining: integer("time_remaining"), // in seconds
-  overallBand: real("overall_band"),
-  listeningBand: real("listening_band"),
-  readingBand: real("reading_band"),
-  writingBand: real("writing_band"),
-  speakingBand: real("speaking_band"),
+// Test session schema
+export const testSessionSchema = z.object({
+  _id: z.instanceof(ObjectId).optional(),
+  userId: z.string(),
+  testType: z.enum(["academic", "general"]),
+  status: z.enum(["in_progress", "completed", "paused"]).default("in_progress"),
+  currentSection: z.enum(["listening", "reading", "writing", "speaking"]).default("listening"),
+  startTime: z.date().default(() => new Date()),
+  endTime: z.date().optional(),
+  timeRemaining: z.number().optional(),
+  overallBand: z.number().optional(),
+  listeningBand: z.number().optional(),
+  readingBand: z.number().optional(),
+  writingBand: z.number().optional(),
+  speakingBand: z.number().optional(),
 });
 
-// Test questions
-export const testQuestions = pgTable("test_questions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  section: text("section").notNull(), // listening, reading, writing, speaking
-  questionType: text("question_type").notNull(), // multiple_choice, fill_blank, essay, etc.
-  content: jsonb("content").notNull(), // question data
-  correctAnswers: jsonb("correct_answers"), // for objective questions
-  orderIndex: integer("order_index").notNull(),
-  audioUrl: text("audio_url"), // for listening questions
-  passage: text("passage"), // for reading questions
-  isActive: boolean("is_active").default(true),
+// Audio file schema for admin uploads
+export const audioFileSchema = z.object({
+  _id: z.instanceof(ObjectId).optional(),
+  filename: z.string(),
+  originalName: z.string(),
+  mimeType: z.string(),
+  size: z.number(),
+  duration: z.number().optional(),
+  transcript: z.string().optional(),
+  uploadedBy: z.string(), // admin user ID
+  uploadedAt: z.date().default(() => new Date()),
+  isActive: z.boolean().default(true),
 });
 
-// Student answers
-export const testAnswers = pgTable("test_answers", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  sessionId: varchar("session_id").notNull(),
-  questionId: varchar("question_id").notNull(),
-  answer: jsonb("answer").notNull(),
-  isCorrect: boolean("is_correct"),
-  score: real("score"),
-  timeSpent: integer("time_spent"), // in seconds
-  submittedAt: timestamp("submitted_at").defaultNow(),
+// Test question schema
+export const testQuestionSchema = z.object({
+  _id: z.instanceof(ObjectId).optional(),
+  section: z.enum(["listening", "reading", "writing", "speaking"]),
+  questionType: z.enum(["multiple_choice", "fill_blank", "short_answer", "essay", "speaking_task"]),
+  content: z.record(z.any()),
+  correctAnswers: z.array(z.string()).optional(),
+  orderIndex: z.number(),
+  audioFileId: z.instanceof(ObjectId).optional(), // Reference to audio file
+  passage: z.string().optional(),
+  isActive: z.boolean().default(true),
+  generatedBy: z.enum(["admin", "ai"]).default("admin"),
+  createdAt: z.date().default(() => new Date()),
 });
 
-// AI evaluations
-export const aiEvaluations = pgTable("ai_evaluations", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  sessionId: varchar("session_id").notNull(),
-  section: text("section").notNull(), // writing, speaking
-  criteria: jsonb("criteria").notNull(), // detailed scoring criteria
-  feedback: text("feedback").notNull(),
-  bandScore: real("band_score").notNull(),
-  aiProvider: text("ai_provider").default("openai"),
-  rawResponse: jsonb("raw_response"),
-  evaluatedAt: timestamp("evaluated_at").defaultNow(),
+// Test answer schema
+export const testAnswerSchema = z.object({
+  _id: z.instanceof(ObjectId).optional(),
+  sessionId: z.string(),
+  questionId: z.string(),
+  answer: z.record(z.any()),
+  isCorrect: z.boolean().optional(),
+  score: z.number().optional(),
+  timeSpent: z.number().optional(),
+  submittedAt: z.date().default(() => new Date()),
 });
 
-// Audio recordings (for speaking)
-export const audioRecordings = pgTable("audio_recordings", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  sessionId: varchar("session_id").notNull(),
-  section: text("section").notNull(),
-  audioUrl: text("audio_url").notNull(),
-  transcript: text("transcript"),
-  duration: integer("duration"), // in seconds
-  recordedAt: timestamp("recorded_at").defaultNow(),
+// AI evaluation schema
+export const aiEvaluationSchema = z.object({
+  _id: z.instanceof(ObjectId).optional(),
+  sessionId: z.string(),
+  section: z.enum(["writing", "speaking"]),
+  criteria: z.record(z.any()),
+  feedback: z.string(),
+  bandScore: z.number(),
+  aiProvider: z.string().default("gemini"),
+  rawResponse: z.record(z.any()).optional(),
+  evaluatedAt: z.date().default(() => new Date()),
 });
 
-// Insert schemas
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
+// Audio recording schema
+export const audioRecordingSchema = z.object({
+  _id: z.instanceof(ObjectId).optional(),
+  sessionId: z.string(),
+  section: z.string(),
+  audioUrl: z.string(),
+  transcript: z.string().optional(),
+  duration: z.number().optional(),
+  recordedAt: z.date().default(() => new Date()),
 });
 
-export const insertTestSessionSchema = createInsertSchema(testSessions).omit({
-  id: true,
-  startTime: true,
-  endTime: true,
-});
+// Insert schemas (for validation before DB insert)
+export const insertUserSchema = userSchema.omit({ _id: true, createdAt: true });
+export const insertTestSessionSchema = testSessionSchema.omit({ _id: true, startTime: true });
+export const insertAudioFileSchema = audioFileSchema.omit({ _id: true, uploadedAt: true });
+export const insertTestQuestionSchema = testQuestionSchema.omit({ _id: true, createdAt: true });
+export const insertTestAnswerSchema = testAnswerSchema.omit({ _id: true, submittedAt: true });
+export const insertAiEvaluationSchema = aiEvaluationSchema.omit({ _id: true, evaluatedAt: true });
+export const insertAudioRecordingSchema = audioRecordingSchema.omit({ _id: true, recordedAt: true });
 
-export const insertTestQuestionSchema = createInsertSchema(testQuestions).omit({
-  id: true,
-});
-
-export const insertTestAnswerSchema = createInsertSchema(testAnswers).omit({
-  id: true,
-  submittedAt: true,
-});
-
-export const insertAiEvaluationSchema = createInsertSchema(aiEvaluations).omit({
-  id: true,
-  evaluatedAt: true,
-});
-
-export const insertAudioRecordingSchema = createInsertSchema(audioRecordings).omit({
-  id: true,
-  recordedAt: true,
-});
-
-// Types
-export type User = typeof users.$inferSelect;
+// TypeScript types
+export type User = z.infer<typeof userSchema>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
-export type TestSession = typeof testSessions.$inferSelect;
+export type TestSession = z.infer<typeof testSessionSchema>;
 export type InsertTestSession = z.infer<typeof insertTestSessionSchema>;
 
-export type TestQuestion = typeof testQuestions.$inferSelect;
+export type AudioFile = z.infer<typeof audioFileSchema>;
+export type InsertAudioFile = z.infer<typeof insertAudioFileSchema>;
+
+export type TestQuestion = z.infer<typeof testQuestionSchema>;
 export type InsertTestQuestion = z.infer<typeof insertTestQuestionSchema>;
 
-export type TestAnswer = typeof testAnswers.$inferSelect;
+export type TestAnswer = z.infer<typeof testAnswerSchema>;
 export type InsertTestAnswer = z.infer<typeof insertTestAnswerSchema>;
 
-export type AiEvaluation = typeof aiEvaluations.$inferSelect;
+export type AiEvaluation = z.infer<typeof aiEvaluationSchema>;
 export type InsertAiEvaluation = z.infer<typeof insertAiEvaluationSchema>;
 
-export type AudioRecording = typeof audioRecordings.$inferSelect;
+export type AudioRecording = z.infer<typeof audioRecordingSchema>;
 export type InsertAudioRecording = z.infer<typeof insertAudioRecordingSchema>;
 
 // Enums for validation

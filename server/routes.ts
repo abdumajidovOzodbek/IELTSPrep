@@ -1,3 +1,4 @@
+
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -9,10 +10,15 @@ import {
   insertTestAnswerSchema, 
   insertAiEvaluationSchema,
   insertAudioRecordingSchema,
+  insertAudioFileSchema,
+  insertTestQuestionSchema,
   TestSectionEnum 
 } from "@shared/schema";
 import rateLimit from "express-rate-limit";
 import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { ObjectId } from "mongodb";
 
 // Rate limiting for AI endpoints
 const aiRateLimit = rateLimit({
@@ -21,18 +27,179 @@ const aiRateLimit = rateLimit({
   message: { error: "Too many AI requests, please try again later" },
   standardHeaders: true,
   legacyHeaders: false,
-  trustProxy: true, // Enable trust proxy for rate limiting
 });
 
-// File upload configuration
+// File upload configuration for audio files
+const audioUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const uploadDir = 'uploads/audio';
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+  }),
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB limit for audio files
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/m4a', 'audio/ogg'];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only audio files are allowed'));
+    }
+  }
+});
+
+// Regular multer for other uploads
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit for audio files
+    fileSize: 50 * 1024 * 1024, // 50MB limit
   },
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Serve uploaded audio files
+  app.use('/uploads', (req, res, next) => {
+    // Add CORS headers for audio files
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET');
+    next();
+  });
+  app.use('/uploads', express.static('uploads'));
+
+  // Admin Audio Upload Endpoints
+  app.post("/api/admin/audio/upload", audioUpload.single("audio"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No audio file provided" });
+      }
+
+      const audioFileData = insertAudioFileSchema.parse({
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+        uploadedBy: req.body.uploadedBy || "admin" // In a real app, get from auth
+      });
+
+      const audioFile = await storage.createAudioFile(audioFileData);
+      
+      res.json({
+        message: "Audio file uploaded successfully",
+        audioFile: {
+          id: audioFile._id,
+          filename: audioFile.filename,
+          originalName: audioFile.originalName,
+          size: audioFile.size,
+          uploadedAt: audioFile.uploadedAt
+        }
+      });
+    } catch (error: any) {
+      console.error("Audio upload error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/audio/list", async (req, res) => {
+    try {
+      const audioFiles = await storage.getAllAudioFiles();
+      res.json(audioFiles);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Generate questions for uploaded audio using AI
+  app.post("/api/admin/audio/:audioId/generate-questions", aiRateLimit, async (req, res) => {
+    try {
+      const { audioId } = req.params;
+      const audioFile = await storage.getAudioFile(audioId);
+      
+      if (!audioFile) {
+        return res.status(404).json({ error: "Audio file not found" });
+      }
+
+      // First, get transcript if not already available
+      let transcript = audioFile.transcript;
+      if (!transcript) {
+        // In a real implementation, you'd transcribe the audio here
+        // For now, we'll ask admin to provide it or use a placeholder
+        transcript = req.body.transcript || "Please provide transcript for better question generation";
+      }
+
+      // Generate questions using AI
+      const questionsPrompt = `Based on this audio transcript, generate 5 IELTS listening questions of different types (multiple choice, fill-in-the-blank, short answer). Make them appropriate for IELTS Academic level.
+
+Transcript: "${transcript}"
+
+Return a JSON array with this format:
+[
+  {
+    "questionType": "multiple_choice",
+    "question": "What is the speaker's main point?",
+    "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"],
+    "correctAnswer": "B",
+    "orderIndex": 1
+  },
+  {
+    "questionType": "fill_blank",
+    "question": "The speaker mentions that the project will take _______ weeks to complete.",
+    "correctAnswer": "six",
+    "orderIndex": 2
+  }
+]`;
+
+      const aiResponse = await openaiService.generateText(questionsPrompt);
+      
+      if (!aiResponse.success) {
+        return res.status(500).json({ error: aiResponse.error });
+      }
+
+      let generatedQuestions;
+      try {
+        generatedQuestions = JSON.parse(aiResponse.data!.text);
+      } catch (parseError) {
+        return res.status(500).json({ error: "Failed to parse AI-generated questions" });
+      }
+
+      // Save questions to database
+      const savedQuestions = [];
+      for (const questionData of generatedQuestions) {
+        const question = insertTestQuestionSchema.parse({
+          section: "listening",
+          questionType: questionData.questionType,
+          content: {
+            question: questionData.question,
+            options: questionData.options || undefined
+          },
+          correctAnswers: [questionData.correctAnswer],
+          orderIndex: questionData.orderIndex,
+          audioFileId: new ObjectId(audioId),
+          generatedBy: "ai"
+        });
+
+        const savedQuestion = await storage.createTestQuestion(question);
+        savedQuestions.push(savedQuestion);
+      }
+
+      res.json({
+        message: `Generated ${savedQuestions.length} questions successfully`,
+        questions: savedQuestions
+      });
+    } catch (error: any) {
+      console.error("Question generation error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Test Sessions
   app.post("/api/sessions", async (req, res) => {
     try {
@@ -69,12 +236,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Test Questions
+  // Modified: Get listening questions with random audio selection
   app.get("/api/questions/:section", async (req, res) => {
     try {
       const section = TestSectionEnum.parse(req.params.section);
-      const questions = await storage.getTestQuestions(section);
-      res.json(questions);
+      
+      if (section === "listening") {
+        // Get a random audio file
+        const randomAudio = await storage.getRandomAudioFile();
+        if (!randomAudio) {
+          return res.status(404).json({ error: "No audio files available" });
+        }
+
+        // Get questions for this audio file
+        const questions = await storage.getQuestionsByAudioFile(randomAudio._id!.toString());
+        
+        // Add audio URL to each question
+        const questionsWithAudio = questions.map(q => ({
+          ...q,
+          audioUrl: `/uploads/audio/${randomAudio.filename}`,
+          audioInfo: {
+            id: randomAudio._id,
+            originalName: randomAudio.originalName,
+            duration: randomAudio.duration
+          }
+        }));
+
+        res.json(questionsWithAudio);
+      } else {
+        const questions = await storage.getTestQuestions(section);
+        res.json(questions);
+      }
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
@@ -110,7 +302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const questions = await storage.getTestQuestions(section);
       
       const sectionAnswers = answers.filter(a => 
-        questions.some(q => q.id === a.questionId)
+        questions.some(q => q._id!.toString() === a.questionId)
       );
 
       if (section === 'listening' || section === 'reading') {
@@ -130,7 +322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // OpenAI/AI endpoints
+  // AI endpoints (keeping existing implementation)
   app.get("/api/ai/health", aiRateLimit, async (req, res) => {
     try {
       const healthCheck = await openaiService.generateText("Test connection");
@@ -164,7 +356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         criteria: evaluation.data,
         feedback: evaluation.data!.improvementTips.join("; "),
         bandScore: evaluation.data!.overallWritingBand,
-        aiProvider: "openai",
+        aiProvider: "gemini",
         rawResponse: evaluation.rawResponse
       });
 
@@ -205,7 +397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         criteria: evaluation.data,
         feedback: evaluation.data!.improvementTips.join("; "),
         bandScore: evaluation.data!.overallSpeakingBand,
-        aiProvider: "openai",
+        aiProvider: "gemini",
         rawResponse: evaluation.rawResponse
       });
 
@@ -225,6 +417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Additional AI endpoints (transcribe, generate content, etc.)
   app.post("/api/ai/transcribe", aiRateLimit, upload.single("audio"), async (req, res) => {
     try {
       if (!req.file) {
@@ -238,100 +431,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json(transcription.data);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post("/api/ai/generate/listening-answers", aiRateLimit, async (req, res) => {
-    try {
-      const { transcript, questions } = req.body;
-      
-      if (!transcript || !questions) {
-        return res.status(400).json({ error: "Missing required fields" });
-      }
-
-      const answers = await openaiService.generateListeningAnswers(transcript, questions);
-      
-      if (!answers.success) {
-        return res.status(500).json({ error: answers.error });
-      }
-
-      res.json(answers.data);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post("/api/ai/speaking/prompt", aiRateLimit, async (req, res) => {
-    try {
-      const context = req.body;
-      
-      const prompt = await openaiService.generateSpeakingPrompt(context);
-      
-      if (!prompt.success) {
-        return res.status(500).json({ error: prompt.error });
-      }
-
-      res.json(prompt.data);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Generate AI-powered listening content with audio
-  app.post("/api/ai/listening/generate", aiRateLimit, async (req, res) => {
-    try {
-      // Generate listening content
-      const content = await openaiService.generateListeningContent();
-      
-      if (!content.success) {
-        return res.status(500).json({ error: content.error });
-      }
-
-      // Generate audio for each section
-      const sectionsWithAudio = [];
-      
-      for (const section of content.data!.sections) {
-        const audioResult = await openaiService.generateAudio(section.transcript, "nova");
-        
-        if (audioResult.success) {
-          sectionsWithAudio.push({
-            ...section,
-            audioUrl: audioResult.data!.audioUrl,
-            duration: audioResult.data!.duration
-          });
-        } else {
-          sectionsWithAudio.push({
-            ...section,
-            audioUrl: null,
-            duration: 0
-          });
-        }
-      }
-
-      res.json({ sections: sectionsWithAudio });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Generate audio for specific text
-  app.post("/api/ai/generate-audio", aiRateLimit, async (req, res) => {
-    try {
-      const { text, voice = "alloy" } = req.body;
-      
-      if (!text) {
-        return res.status(400).json({ error: "Text is required" });
-      }
-
-      const audioResult = await openaiService.generateAudio(text, voice);
-      
-      if (!audioResult.success) {
-        return res.status(500).json({ error: audioResult.error });
-      }
-
-      res.json(audioResult.data);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -387,12 +486,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const sessions = await storage.getAllTestSessions();
       const completedSessions = sessions.filter(s => s.status === "completed");
+      const audioFiles = await storage.getAllAudioFiles();
       
       const stats = {
         totalSessions: sessions.length,
         completedSessions: completedSessions.length,
         averageBand: completedSessions.reduce((acc, s) => acc + (s.overallBand || 0), 0) / completedSessions.length || 0,
         aiEvaluations: completedSessions.length * 2, // Writing + Speaking
+        audioFiles: audioFiles.length,
         systemStatus: "operational"
       };
 
@@ -431,12 +532,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  });
-
-  // Serve static audio files (in production, use a proper CDN)
-  app.use('/audio', (req, res) => {
-    // Return 404 for audio files since we don't have real audio files in this demo
-    res.status(404).json({ error: 'Audio file not found' });
   });
 
   const httpServer = createServer(app);

@@ -1,12 +1,14 @@
+
+import { MongoClient, Db, ObjectId } from "mongodb";
 import { 
   type User, type InsertUser,
   type TestSession, type InsertTestSession,
+  type AudioFile, type InsertAudioFile,
   type TestQuestion, type InsertTestQuestion,
   type TestAnswer, type InsertTestAnswer,
   type AiEvaluation, type InsertAiEvaluation,
   type AudioRecording, type InsertAudioRecording
 } from "@shared/schema";
-import { randomUUID } from "crypto";
 
 export interface IStorage {
   // Users
@@ -22,11 +24,18 @@ export interface IStorage {
   getUserTestSessions(userId: string): Promise<TestSession[]>;
   getAllTestSessions(): Promise<TestSession[]>;
 
+  // Audio Files
+  createAudioFile(audioFile: InsertAudioFile): Promise<AudioFile>;
+  getAudioFile(id: string): Promise<AudioFile | undefined>;
+  getAllAudioFiles(): Promise<AudioFile[]>;
+  getRandomAudioFile(): Promise<AudioFile | undefined>;
+
   // Test Questions
   createTestQuestion(question: InsertTestQuestion): Promise<TestQuestion>;
   getTestQuestions(section: string): Promise<TestQuestion[]>;
   getTestQuestion(id: string): Promise<TestQuestion | undefined>;
   updateTestQuestion(id: string, updates: Partial<TestQuestion>): Promise<TestQuestion | undefined>;
+  getQuestionsByAudioFile(audioFileId: string): Promise<TestQuestion[]>;
 
   // Test Answers
   createTestAnswer(answer: InsertTestAnswer): Promise<TestAnswer>;
@@ -42,227 +51,214 @@ export interface IStorage {
   getSessionRecordings(sessionId: string): Promise<AudioRecording[]>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User> = new Map();
-  private testSessions: Map<string, TestSession> = new Map();
-  private testQuestions: Map<string, TestQuestion> = new Map();
-  private testAnswers: Map<string, TestAnswer> = new Map();
-  private aiEvaluations: Map<string, AiEvaluation> = new Map();
-  private audioRecordings: Map<string, AudioRecording> = new Map();
+export class MongoStorage implements IStorage {
+  private client: MongoClient;
+  private db: Db;
 
   constructor() {
-    this.seedData();
+    const connectionString = process.env.DATABASE_URL || "mongodb+srv://ozod:1234ozod@cluster0.51dlocb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+    this.client = new MongoClient(connectionString);
+    this.db = this.client.db("ielts_test_platform");
   }
 
-  private seedData() {
-    // Create sample questions for testing
-    const sampleQuestions: InsertTestQuestion[] = [
-      {
-        section: "listening",
-        questionType: "multiple_choice",
-        content: {
-          question: "What is the student's main reason for visiting the office?",
-          options: ["To register for a new course", "To change his timetable", "To get his student ID card"]
-        },
-        correctAnswers: ["B"],
-        orderIndex: 1,
-        audioUrl: "/audio/listening-section1.mp3"
-      },
-      {
-        section: "listening",
-        questionType: "fill_blank",
-        content: {
-          question: "The student's surname is ___________"
-        },
-        correctAnswers: ["Wilson"],
-        orderIndex: 2,
-        audioUrl: "/audio/listening-section1.mp3"
-      },
-      {
-        section: "reading",
-        questionType: "multiple_choice",
-        content: {
-          question: "According to the passage, what is the main cause of urban heat islands?",
-          options: ["Industrial pollution", "Concrete and asphalt surfaces", "Vehicle emissions", "Population density"]
-        },
-        correctAnswers: ["B"],
-        orderIndex: 1,
-        passage: "Urban heat islands are metropolitan areas that are significantly warmer than their surrounding rural areas..."
-      },
-      {
-        section: "writing",
-        questionType: "essay",
-        content: {
-          task: "task1",
-          prompt: "The chart below shows the percentage of households in owned and rented accommodation in England and Wales between 1918 and 2011. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.",
-          minWords: 150,
-          timeLimit: 20
-        },
-        orderIndex: 1
-      },
-      {
-        section: "speaking",
-        questionType: "speaking_task",
-        content: {
-          part: 2,
-          topic: "Describe a place you visited that was particularly memorable.",
-          bullets: ["where this place was", "when you visited it", "what you did there", "and explain why it was so memorable for you"],
-          preparationTime: 60,
-          speakingTime: 120
-        },
-        orderIndex: 1
-      }
-    ];
+  async connect(): Promise<void> {
+    await this.client.connect();
+    console.log("Connected to MongoDB");
+  }
 
-    sampleQuestions.forEach(q => {
-      const id = randomUUID();
-      const question: TestQuestion = { 
-        ...q, 
-        id, 
-        isActive: true,
-        correctAnswers: q.correctAnswers || null,
-        audioUrl: q.audioUrl || null,
-        passage: q.passage || null
-      };
-      this.testQuestions.set(id, question);
-    });
+  async disconnect(): Promise<void> {
+    await this.client.close();
   }
 
   // Users
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    try {
+      const user = await this.db.collection("users").findOne({ _id: new ObjectId(id) });
+      return user ? { ...user, _id: user._id } as User : undefined;
+    } catch (error) {
+      return undefined;
+    }
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.username === username);
+    const user = await this.db.collection("users").findOne({ username });
+    return user ? { ...user, _id: user._id } as User : undefined;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.email === email);
+    const user = await this.db.collection("users").findOne({ email });
+    return user ? { ...user, _id: user._id } as User : undefined;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { 
-      ...insertUser, 
-      id, 
-      createdAt: new Date(),
-      role: insertUser.role || 'student'
-    };
-    this.users.set(id, user);
-    return user;
+  async createUser(userData: InsertUser): Promise<User> {
+    const user = { ...userData, createdAt: new Date() };
+    const result = await this.db.collection("users").insertOne(user);
+    return { ...user, _id: result.insertedId } as User;
   }
 
   // Test Sessions
-  async createTestSession(insertSession: InsertTestSession): Promise<TestSession> {
-    const id = randomUUID();
-    const session: TestSession = {
-      ...insertSession,
-      id,
-      startTime: new Date(),
-      endTime: null,
-      overallBand: null,
-      listeningBand: null,
-      readingBand: null,
-      writingBand: null,
-      speakingBand: null,
-      status: insertSession.status || 'in-progress',
-      currentSection: insertSession.currentSection || null,
-      timeRemaining: insertSession.timeRemaining || null
-    };
-    this.testSessions.set(id, session);
-    return session;
+  async createTestSession(sessionData: InsertTestSession): Promise<TestSession> {
+    const session = { ...sessionData, startTime: new Date() };
+    const result = await this.db.collection("testSessions").insertOne(session);
+    return { ...session, _id: result.insertedId } as TestSession;
   }
 
   async getTestSession(id: string): Promise<TestSession | undefined> {
-    return this.testSessions.get(id);
+    try {
+      const session = await this.db.collection("testSessions").findOne({ _id: new ObjectId(id) });
+      return session ? { ...session, _id: session._id } as TestSession : undefined;
+    } catch (error) {
+      return undefined;
+    }
   }
 
   async updateTestSession(id: string, updates: Partial<TestSession>): Promise<TestSession | undefined> {
-    const session = this.testSessions.get(id);
-    if (!session) return undefined;
-    
-    const updated = { ...session, ...updates };
-    this.testSessions.set(id, updated);
-    return updated;
+    try {
+      const result = await this.db.collection("testSessions").findOneAndUpdate(
+        { _id: new ObjectId(id) },
+        { $set: updates },
+        { returnDocument: "after" }
+      );
+      return result ? { ...result, _id: result._id } as TestSession : undefined;
+    } catch (error) {
+      return undefined;
+    }
   }
 
   async getUserTestSessions(userId: string): Promise<TestSession[]> {
-    return Array.from(this.testSessions.values()).filter(session => session.userId === userId);
+    const sessions = await this.db.collection("testSessions").find({ userId }).toArray();
+    return sessions.map(session => ({ ...session, _id: session._id } as TestSession));
   }
 
   async getAllTestSessions(): Promise<TestSession[]> {
-    return Array.from(this.testSessions.values());
+    const sessions = await this.db.collection("testSessions").find({}).toArray();
+    return sessions.map(session => ({ ...session, _id: session._id } as TestSession));
+  }
+
+  // Audio Files
+  async createAudioFile(audioFileData: InsertAudioFile): Promise<AudioFile> {
+    const audioFile = { ...audioFileData, uploadedAt: new Date() };
+    const result = await this.db.collection("audioFiles").insertOne(audioFile);
+    return { ...audioFile, _id: result.insertedId } as AudioFile;
+  }
+
+  async getAudioFile(id: string): Promise<AudioFile | undefined> {
+    try {
+      const audioFile = await this.db.collection("audioFiles").findOne({ _id: new ObjectId(id) });
+      return audioFile ? { ...audioFile, _id: audioFile._id } as AudioFile : undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  async getAllAudioFiles(): Promise<AudioFile[]> {
+    const audioFiles = await this.db.collection("audioFiles").find({ isActive: true }).toArray();
+    return audioFiles.map(file => ({ ...file, _id: file._id } as AudioFile));
+  }
+
+  async getRandomAudioFile(): Promise<AudioFile | undefined> {
+    const audioFiles = await this.db.collection("audioFiles").find({ isActive: true }).toArray();
+    if (audioFiles.length === 0) return undefined;
+    const randomIndex = Math.floor(Math.random() * audioFiles.length);
+    const selectedFile = audioFiles[randomIndex];
+    return { ...selectedFile, _id: selectedFile._id } as AudioFile;
   }
 
   // Test Questions
-  async createTestQuestion(insertQuestion: InsertTestQuestion): Promise<TestQuestion> {
-    const id = randomUUID();
-    const question: TestQuestion = { ...insertQuestion, id, isActive: true };
-    this.testQuestions.set(id, question);
-    return question;
+  async createTestQuestion(questionData: InsertTestQuestion): Promise<TestQuestion> {
+    const question = { ...questionData, createdAt: new Date() };
+    const result = await this.db.collection("testQuestions").insertOne(question);
+    return { ...question, _id: result.insertedId } as TestQuestion;
   }
 
   async getTestQuestions(section: string): Promise<TestQuestion[]> {
-    return Array.from(this.testQuestions.values())
-      .filter(q => q.section === section && q.isActive)
-      .sort((a, b) => a.orderIndex - b.orderIndex);
+    const questions = await this.db.collection("testQuestions").find({ 
+      section, 
+      isActive: true 
+    }).sort({ orderIndex: 1 }).toArray();
+    return questions.map(question => ({ ...question, _id: question._id } as TestQuestion));
   }
 
   async getTestQuestion(id: string): Promise<TestQuestion | undefined> {
-    return this.testQuestions.get(id);
+    try {
+      const question = await this.db.collection("testQuestions").findOne({ _id: new ObjectId(id) });
+      return question ? { ...question, _id: question._id } as TestQuestion : undefined;
+    } catch (error) {
+      return undefined;
+    }
   }
 
   async updateTestQuestion(id: string, updates: Partial<TestQuestion>): Promise<TestQuestion | undefined> {
-    const question = this.testQuestions.get(id);
-    if (!question) return undefined;
-    
-    const updated = { ...question, ...updates };
-    this.testQuestions.set(id, updated);
-    return updated;
+    try {
+      const result = await this.db.collection("testQuestions").findOneAndUpdate(
+        { _id: new ObjectId(id) },
+        { $set: updates },
+        { returnDocument: "after" }
+      );
+      return result ? { ...result, _id: result._id } as TestQuestion : undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  async getQuestionsByAudioFile(audioFileId: string): Promise<TestQuestion[]> {
+    try {
+      const questions = await this.db.collection("testQuestions").find({ 
+        audioFileId: new ObjectId(audioFileId),
+        isActive: true 
+      }).sort({ orderIndex: 1 }).toArray();
+      return questions.map(question => ({ ...question, _id: question._id } as TestQuestion));
+    } catch (error) {
+      return [];
+    }
   }
 
   // Test Answers
-  async createTestAnswer(insertAnswer: InsertTestAnswer): Promise<TestAnswer> {
-    const id = randomUUID();
-    const answer: TestAnswer = { ...insertAnswer, id, submittedAt: new Date() };
-    this.testAnswers.set(id, answer);
-    return answer;
+  async createTestAnswer(answerData: InsertTestAnswer): Promise<TestAnswer> {
+    const answer = { ...answerData, submittedAt: new Date() };
+    const result = await this.db.collection("testAnswers").insertOne(answer);
+    return { ...answer, _id: result.insertedId } as TestAnswer;
   }
 
   async getSessionAnswers(sessionId: string): Promise<TestAnswer[]> {
-    return Array.from(this.testAnswers.values()).filter(answer => answer.sessionId === sessionId);
+    const answers = await this.db.collection("testAnswers").find({ sessionId }).toArray();
+    return answers.map(answer => ({ ...answer, _id: answer._id } as TestAnswer));
   }
 
   async getQuestionAnswer(sessionId: string, questionId: string): Promise<TestAnswer | undefined> {
-    return Array.from(this.testAnswers.values()).find(
-      answer => answer.sessionId === sessionId && answer.questionId === questionId
-    );
+    const answer = await this.db.collection("testAnswers").findOne({ sessionId, questionId });
+    return answer ? { ...answer, _id: answer._id } as TestAnswer : undefined;
   }
 
   // AI Evaluations
-  async createAiEvaluation(insertEvaluation: InsertAiEvaluation): Promise<AiEvaluation> {
-    const id = randomUUID();
-    const evaluation: AiEvaluation = { ...insertEvaluation, id, evaluatedAt: new Date() };
-    this.aiEvaluations.set(id, evaluation);
-    return evaluation;
+  async createAiEvaluation(evaluationData: InsertAiEvaluation): Promise<AiEvaluation> {
+    const evaluation = { ...evaluationData, evaluatedAt: new Date() };
+    const result = await this.db.collection("aiEvaluations").insertOne(evaluation);
+    return { ...evaluation, _id: result.insertedId } as AiEvaluation;
   }
 
   async getSessionEvaluations(sessionId: string): Promise<AiEvaluation[]> {
-    return Array.from(this.aiEvaluations.values()).filter(evaluation => evaluation.sessionId === sessionId);
+    const evaluations = await this.db.collection("aiEvaluations").find({ sessionId }).toArray();
+    return evaluations.map(evaluation => ({ ...evaluation, _id: evaluation._id } as AiEvaluation));
   }
 
   // Audio Recordings
-  async createAudioRecording(insertRecording: InsertAudioRecording): Promise<AudioRecording> {
-    const id = randomUUID();
-    const recording: AudioRecording = { ...insertRecording, id, recordedAt: new Date() };
-    this.audioRecordings.set(id, recording);
-    return recording;
+  async createAudioRecording(recordingData: InsertAudioRecording): Promise<AudioRecording> {
+    const recording = { ...recordingData, recordedAt: new Date() };
+    const result = await this.db.collection("audioRecordings").insertOne(recording);
+    return { ...recording, _id: result.insertedId } as AudioRecording;
   }
 
   async getSessionRecordings(sessionId: string): Promise<AudioRecording[]> {
-    return Array.from(this.audioRecordings.values()).filter(recording => recording.sessionId === sessionId);
+    const recordings = await this.db.collection("audioRecordings").find({ sessionId }).toArray();
+    return recordings.map(recording => ({ ...recording, _id: recording._id } as AudioRecording));
   }
 }
 
-export const storage = new MemStorage();
+// Create and export storage instance
+const storage = new MongoStorage();
+
+// Connect to MongoDB on startup
+storage.connect().catch(console.error);
+
+export { storage };
