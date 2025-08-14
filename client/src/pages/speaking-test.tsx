@@ -67,7 +67,7 @@ export default function SpeakingTest() {
       <div className="flex flex-1">
         <TestNavigation currentSection="speaking" sessionId={sessionId} />
         
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-6 ml-64">
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Section Header */}
             <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
