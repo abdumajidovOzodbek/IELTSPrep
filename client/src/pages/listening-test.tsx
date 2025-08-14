@@ -17,13 +17,49 @@ export default function ListeningTest() {
   // Generate AI listening content with audio
   const { data: listeningContent, isLoading: isGenerating } = useQuery({
     queryKey: ["/api/ai/listening/generate"],
+    queryFn: async () => {
+      try {
+        const response = await apiRequest("POST", "/api/ai/listening/generate", {
+          sessionId,
+          difficulty: "intermediate"
+        });
+        return await response.json();
+      } catch (error) {
+        console.warn("AI content generation failed, using fallback");
+        return null;
+      }
+    },
     staleTime: 300000, // Cache for 5 minutes
     refetchOnWindowFocus: false,
+    retry: false, // Don't retry if AI generation fails
+    enabled: !!sessionId, // Only run when we have a session
   });
 
   const { data: questions = [], isLoading } = useQuery({
     queryKey: ["/api/questions/listening"],
-    enabled: false, // Disable static questions, use AI-generated content
+    queryFn: async () => {
+      try {
+        const response = await apiRequest("GET", "/api/questions/listening");
+        return await response.json();
+      } catch (error) {
+        console.warn("Failed to load questions, using fallback");
+        return [
+          {
+            id: "1",
+            question: "What is the main topic of the conversation?",
+            options: ["University enrollment", "Course selection", "Library services", "Campus tour"],
+            type: "multiple_choice"
+          },
+          {
+            id: "2", 
+            question: "When does the semester begin?",
+            options: ["September 1st", "September 15th", "October 1st", "October 15th"],
+            type: "multiple_choice"
+          }
+        ];
+      }
+    },
+    enabled: !listeningContent, // Only load fallback questions if AI content fails
   });
 
   const submitAnswerMutation = useMutation({
@@ -67,13 +103,21 @@ export default function ListeningTest() {
     }
   };
 
-  if (isGenerating || isLoading || !session) {
+  if (!session) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-        <p className="text-slate-600">
-          {isGenerating ? "Generating AI-powered listening test with audio..." : "Loading test questions..."}
-        </p>
+        <p className="text-slate-600">Loading test session...</p>
+      </div>
+    </div>;
+  }
+
+  // Show loading only if both AI content and fallback questions are loading
+  if (isGenerating && isLoading) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+        <p className="text-slate-600">Loading test questions...</p>
       </div>
     </div>;
   }

@@ -17,6 +17,22 @@ export default function ReadingTest() {
 
   const { data: questions = [], isLoading } = useQuery({
     queryKey: ["/api/questions/reading"],
+    queryFn: async () => {
+      try {
+        const response = await apiRequest("GET", "/api/questions/reading");
+        return await response.json();
+      } catch (error) {
+        console.warn("Failed to load reading questions, using fallback");
+        return [
+          {
+            id: "1",
+            question: "According to the passage, what is the main cause of urban heat islands?",
+            options: ["Energy usage", "Land surface modification", "Population growth", "Air pollution"],
+            type: "multiple_choice"
+          }
+        ];
+      }
+    },
   });
 
   const submitAnswerMutation = useMutation({
