@@ -149,7 +149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!transcriptionResult.success) {
           throw new Error(`Transcription failed: ${transcriptionResult.error}`);
         }
-        const transcript = transcriptionResult.data.text;
+        const transcript = transcriptionResult.data?.text || "";
 
         // Generate section title and instructions
         const contentGenerationPrompt = `Based on the following transcript, generate a concise and engaging title for this listening section and clear instructions for the user on how to answer the questions. Also, generate 5 IELTS-style listening questions of varying types (multiple choice, fill-in-the-blank, matching, map/diagram labeling).
@@ -209,7 +209,16 @@ Return a JSON object with the following structure:
         let generatedContent;
         try {
           console.log("AI Response:", aiResponse.data?.text?.substring(0, 500));
-          generatedContent = JSON.parse(aiResponse.data!.text);
+          
+          // Clean the AI response - remove markdown code blocks if present
+          let cleanedResponse = aiResponse.data!.text;
+          if (cleanedResponse.startsWith('```json')) {
+            cleanedResponse = cleanedResponse.replace(/```json\s*/, '').replace(/\s*```\s*$/, '');
+          } else if (cleanedResponse.startsWith('```')) {
+            cleanedResponse = cleanedResponse.replace(/```\s*/, '').replace(/\s*```\s*$/, '');
+          }
+          
+          generatedContent = JSON.parse(cleanedResponse);
           sectionTitle = generatedContent.sectionTitle;
           instructions = generatedContent.instructions;
           questions = generatedContent.questions;
