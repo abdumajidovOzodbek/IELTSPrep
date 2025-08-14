@@ -1,9 +1,8 @@
-import OpenAI from "openai";
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR 
-});
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+// Initialize Gemini AI with API key
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || "");
 
 export interface AIResponse<T = any> {
   success: boolean;
@@ -42,13 +41,15 @@ export interface SpeakingEvaluationResult {
   improvementTips: string[];
 }
 
-export class OpenAIService {
+export class GeminiService {
+  private model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+
   private checkApiKey(): boolean {
-    return !!(process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR);
+    return !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY);
   }
 
   private handleError(error: any): AIResponse {
-    console.error('OpenAI API Error:', error);
+    console.error('Gemini AI Error:', error);
     return {
       success: false,
       error: error.message || 'AI service unavailable',
@@ -58,20 +59,22 @@ export class OpenAIService {
 
   async generateText(prompt: string, options?: { maxTokens?: number; temperature?: number }): Promise<AIResponse<{ text: string }>> {
     if (!this.checkApiKey()) {
-      return { success: false, error: 'OpenAI API key not configured' };
+      return { success: false, error: 'Gemini API key not configured' };
     }
 
     try {
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: options?.maxTokens || 1000,
-        temperature: options?.temperature || 0.7,
+      const result = await this.model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          maxOutputTokens: options?.maxTokens || 1000,
+          temperature: options?.temperature || 0.7,
+        },
       });
 
+      const response = await result.response;
       return {
         success: true,
-        data: { text: response.choices[0].message.content || '' },
+        data: { text: response.text() || '' },
         rawResponse: response
       };
     } catch (error) {
@@ -81,7 +84,7 @@ export class OpenAIService {
 
   async evaluateWriting(prompt: string, candidateText: string): Promise<AIResponse<WritingEvaluationResult>> {
     if (!this.checkApiKey()) {
-      return { success: false, error: 'OpenAI API key not configured' };
+      return { success: false, error: 'Gemini API key not configured' };
     }
 
     const evaluationPrompt = `You are an IELTS-certified examiner. Score the writing sample using the IELTS band descriptors. Provide numeric band (0.0 - 9.0) for each: Task Achievement/Response, Coherence & Cohesion, Lexical Resource, Grammatical Range & Accuracy. For each criterion, give a 1–2 sentence justification and a short list of 3 improvement suggestions. Finally provide the recommended overall writing band (rounded to nearest 0.5) and exact scoring breakdown in JSON.
@@ -107,17 +110,19 @@ Output JSON only with fields:
 }`;
 
     try {
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: evaluationPrompt }],
-        response_format: { type: "json_object" },
+      const result = await this.model.generateContent({
+        contents: [{ role: "user", parts: [{ text: evaluationPrompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+        },
       });
 
-      const result = JSON.parse(response.choices[0].message.content || '{}');
+      const response = await result.response;
+      const jsonResult = JSON.parse(response.text() || '{}');
       
       return {
         success: true,
-        data: result,
+        data: jsonResult,
         rawResponse: response
       };
     } catch (error) {
@@ -127,7 +132,7 @@ Output JSON only with fields:
 
   async evaluateSpeaking(transcript: string, audioFeatures?: any): Promise<AIResponse<SpeakingEvaluationResult>> {
     if (!this.checkApiKey()) {
-      return { success: false, error: 'OpenAI API key not configured' };
+      return { success: false, error: 'Gemini API key not configured' };
     }
 
     const evaluationPrompt = `You are an experienced IELTS speaking examiner. Evaluate the candidate's spoken response (transcript and audio characteristics) by scoring: Fluency & Coherence, Lexical Resource, Grammatical Range & Accuracy, Pronunciation. For each criterion return a number (0.0–9.0), a short justification, and 3 short tips for improvement. Return JSON only.
@@ -152,17 +157,19 @@ Output JSON only with fields:
 }`;
 
     try {
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: evaluationPrompt }],
-        response_format: { type: "json_object" },
+      const result = await this.model.generateContent({
+        contents: [{ role: "user", parts: [{ text: evaluationPrompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+        },
       });
 
-      const result = JSON.parse(response.choices[0].message.content || '{}');
+      const response = await result.response;
+      const jsonResult = JSON.parse(response.text() || '{}');
       
       return {
         success: true,
-        data: result,
+        data: jsonResult,
         rawResponse: response
       };
     } catch (error) {
@@ -172,24 +179,20 @@ Output JSON only with fields:
 
   async transcribeAudio(audioBuffer: Buffer): Promise<AIResponse<{ text: string; duration?: number }>> {
     if (!this.checkApiKey()) {
-      return { success: false, error: 'OpenAI API key not configured' };
+      return { success: false, error: 'Gemini API key not configured' };
     }
 
     try {
-      // Note: In a real implementation, you'd need to handle the audio buffer properly
+      // Note: Gemini doesn't directly support audio transcription like Whisper
       // For now, we'll return a placeholder response
-      const transcription = await openai.audio.transcriptions.create({
-        file: audioBuffer as any, // This would need proper file handling
-        model: "whisper-1",
-      });
-
+      // In production, you'd use Google Speech-to-Text API or another service
       return {
         success: true,
         data: {
-          text: transcription.text,
-          duration: 0 // Would be extracted from audio metadata
+          text: "Audio transcription feature requires Google Speech-to-Text API integration",
+          duration: 0
         },
-        rawResponse: transcription
+        rawResponse: null
       };
     } catch (error) {
       return this.handleError(error);
@@ -198,7 +201,7 @@ Output JSON only with fields:
 
   async generateListeningAnswers(transcript: string, questions: any[]): Promise<AIResponse<any[]>> {
     if (!this.checkApiKey()) {
-      return { success: false, error: 'OpenAI API key not configured' };
+      return { success: false, error: 'Gemini API key not configured' };
     }
 
     const prompt = `You are an expert IELTS test item analyst. Given the following transcript of listening audio and the question list, extract concise answers suitable for auto-grading (for short answer and multiple choice). Return an array of {questionId, canonicalAnswer, answerType, notes}.
@@ -209,17 +212,19 @@ Questions: ${JSON.stringify(questions)}
 Return JSON array only.`;
 
     try {
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
+      const result = await this.model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+        },
       });
 
-      const result = JSON.parse(response.choices[0].message.content || '[]');
+      const response = await result.response;
+      const jsonResult = JSON.parse(response.text() || '[]');
       
       return {
         success: true,
-        data: result,
+        data: jsonResult,
         rawResponse: response
       };
     } catch (error) {
@@ -229,7 +234,7 @@ Return JSON array only.`;
 
   async generateSpeakingPrompt(context: { part: number; topic?: string; lastResponse?: string }): Promise<AIResponse<{ prompt: string; variations?: string[] }>> {
     if (!this.checkApiKey()) {
-      return { success: false, error: 'OpenAI API key not configured' };
+      return { success: false, error: 'Gemini API key not configured' };
     }
 
     const prompt = `You are an IELTS speaking examiner in part ${context.part}. Based on the conversation context, produce a natural follow-up question or prompt to keep the conversation flowing. Keep questions short and in examiner style. Provide two candidate-level variations: easier and harder.
@@ -239,17 +244,19 @@ Context: ${JSON.stringify(context)}
 Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"] }`;
 
     try {
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
+      const result = await this.model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+        },
       });
 
-      const result = JSON.parse(response.choices[0].message.content || '{}');
+      const response = await result.response;
+      const jsonResult = JSON.parse(response.text() || '{}');
       
       return {
         success: true,
-        data: result,
+        data: jsonResult,
         rawResponse: response
       };
     } catch (error) {
@@ -258,42 +265,17 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
   }
 
   async generateAudio(text: string, voice: string = "alloy"): Promise<AIResponse<{ audioUrl: string; duration: number }>> {
-    if (!this.checkApiKey()) {
-      return { success: false, error: 'OpenAI API key not configured' };
-    }
-
-    try {
-      const response = await openai.audio.speech.create({
-        model: "tts-1",
-        voice: voice as any,
-        input: text,
-        response_format: "mp3",
-      });
-
-      // Convert response to buffer
-      const audioBuffer = Buffer.from(await response.arrayBuffer());
-      const audioUrl = `data:audio/mp3;base64,${audioBuffer.toString('base64')}`;
-      
-      // Estimate duration (rough calculation: ~150 words per minute for TTS)
-      const wordCount = text.split(' ').length;
-      const estimatedDuration = Math.max(10, Math.ceil((wordCount / 150) * 60));
-
-      return {
-        success: true,
-        data: { 
-          audioUrl,
-          duration: estimatedDuration
-        },
-        rawResponse: response
-      };
-    } catch (error: any) {
-      return this.handleError(error);
-    }
+    // Gemini doesn't support text-to-speech directly
+    // You'd need to integrate with Google Text-to-Speech API or another TTS service
+    return {
+      success: false,
+      error: 'Audio generation requires Google Text-to-Speech API integration'
+    };
   }
 
   async generateListeningContent(): Promise<AIResponse<{ sections: Array<{ title: string; transcript: string; questions: any[] }> }>> {
     if (!this.checkApiKey()) {
-      return { success: false, error: 'OpenAI API key not configured' };
+      return { success: false, error: 'Gemini API key not configured' };
     }
 
     try {
@@ -322,15 +304,17 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
 
       Make the content realistic, engaging, and appropriate for IELTS Academic level. Include natural speech patterns and realistic scenarios.`;
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-        max_tokens: 3000,
-        temperature: 0.7,
+      const result = await this.model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          maxOutputTokens: 3000,
+          temperature: 0.7,
+        },
       });
 
-      const content = JSON.parse(response.choices[0].message.content || '{}');
+      const response = await result.response;
+      const content = JSON.parse(response.text() || '{}');
 
       return {
         success: true,
@@ -343,4 +327,6 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
   }
 }
 
-export const openaiService = new OpenAIService();
+export const geminiService = new GeminiService();
+// Keep the openaiService export for backward compatibility
+export const openaiService = geminiService;

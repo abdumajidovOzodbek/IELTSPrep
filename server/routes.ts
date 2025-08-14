@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { openaiService } from "./services/openai";
+import { geminiService as openaiService } from "./services/openai";
 import { ScoringService } from "./lib/scoring";
 import { rawScoreToBand, calculateOverallBand } from "./lib/band-mapping";
 import { 
@@ -21,6 +21,7 @@ const aiRateLimit = rateLimit({
   message: { error: "Too many AI requests, please try again later" },
   standardHeaders: true,
   legacyHeaders: false,
+  trustProxy: true, // Enable trust proxy for rate limiting
 });
 
 // File upload configuration
