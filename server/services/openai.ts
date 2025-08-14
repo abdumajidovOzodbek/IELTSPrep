@@ -193,18 +193,46 @@ Output JSON only with fields:
     }
 
     try {
-      // Note: Gemini doesn't directly support audio transcription like Whisper
-      // For now, we'll return a placeholder response
-      // In production, you'd use Google Speech-to-Text API or another service
+      // Convert audio buffer to base64 for Gemini processing
+      const base64Audio = audioBuffer.toString('base64');
+      
+      // Use Gemini to analyze the audio and provide transcription
+      const prompt = `Please transcribe this audio file. Provide an accurate, word-for-word transcription of all speech in the audio. Include speaker identification if multiple speakers are present. Format as natural dialogue or monologue as appropriate.`;
+
+      const result = await this.model.generateContent({
+        contents: [{
+          role: "user", 
+          parts: [
+            { text: prompt },
+            { 
+              inlineData: {
+                mimeType: "audio/mpeg", // Adjust based on actual audio format
+                data: base64Audio
+              }
+            }
+          ]
+        }],
+        generationConfig: {
+          maxOutputTokens: 2000,
+          temperature: 0.1, // Low temperature for accuracy
+        },
+      });
+
+      const response = await result.response;
+      const transcribedText = response.text() || "Could not transcribe audio";
+
+      console.log("Audio transcription result:", transcribedText.substring(0, 200) + "...");
+
       return {
         success: true,
         data: {
-          text: "Audio transcription feature requires Google Speech-to-Text API integration",
-          duration: 0
+          text: transcribedText,
+          duration: Math.floor(audioBuffer.length / 16000) // Rough estimate
         },
-        rawResponse: null
+        rawResponse: response
       };
     } catch (error) {
+      console.error("Audio transcription error:", error);
       return this.handleError(error);
     }
   }
@@ -283,48 +311,76 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
     };
   }
 
-  async generateListeningContent(): Promise<AIResponse<{ sections: Array<{ title: string; transcript: string; questions: any[] }> }>> {
+  async generateListeningContent(): Promise<AIResponse<{ sections: Array<{ title: string; transcript: string; questions: any[]; audioUrl?: string }> }>> {
     if (!this.checkApiKey()) {
       return { success: false, error: 'Gemini API key not configured' };
     }
 
     try {
-      const prompt = `Generate complete IELTS Listening test content with 3 sections. Each section should have:
-      1. A realistic conversation or monologue transcript (2-3 minutes of spoken content)
-      2. 3-4 multiple choice questions based on the audio
-      3. Appropriate difficulty progression from section 1 to 3
+      const prompt = `Generate a complete IELTS Listening test with exactly 4 sections, 40 questions total (10 questions per section). Each section should have:
 
-      Format as JSON with this structure:
+      Section 1: Everyday conversation (social survival) - 2 speakers
+      Section 2: Monologue in everyday context (social survival) - 1 speaker  
+      Section 3: Academic conversation - up to 4 speakers
+      Section 4: Academic lecture or monologue - 1 speaker
+
+      Each section needs:
+      1. Realistic transcript (3-4 minutes of natural spoken content)
+      2. 10 questions using IELTS question types: multiple choice, form completion, note completion, table completion, labelling diagrams/maps, classification, matching, sentence completion
+      3. Progressive difficulty from Section 1 (easiest) to Section 4 (hardest)
+
+      Return JSON format:
       {
         "sections": [
           {
-            "title": "Section 1 - Everyday Conversation",
-            "transcript": "Full transcript of conversation between Sarah and hotel receptionist discussing room booking...",
+            "sectionNumber": 1,
+            "title": "Section 1 - Everyday Conversation", 
+            "instructions": "You will hear a conversation between...",
+            "transcript": "Speaker 1: Good morning, I'd like to make a reservation...",
             "questions": [
               {
-                "id": "q1",
-                "question": "What is the main purpose of the call?",
-                "options": ["A) To book a hotel", "B) To cancel a reservation", "C) To make a complaint", "D) To ask for directions"],
-                "correct": "A"
+                "_id": "q1",
+                "questionType": "multiple_choice",
+                "content": {
+                  "question": "What does the caller want to do?",
+                  "options": ["Make a reservation", "Cancel a booking", "Complain about service", "Get directions"]
+                },
+                "correctAnswers": ["Make a reservation"],
+                "orderIndex": 1
+              },
+              {
+                "_id": "q2", 
+                "questionType": "fill_blank",
+                "content": {
+                  "question": "The booking is for _______ people."
+                },
+                "correctAnswers": ["two", "2"],
+                "orderIndex": 2
               }
             ]
           }
         ]
       }
 
-      Make the content realistic, engaging, and appropriate for IELTS Academic level. Include natural speech patterns and realistic scenarios.`;
+      Make it authentic IELTS Academic level content with natural speech patterns, realistic scenarios, and proper British/International English.`;
 
       const result = await this.model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
           responseMimeType: "application/json",
-          maxOutputTokens: 3000,
-          temperature: 0.7,
+          maxOutputTokens: 8000,
+          temperature: 0.8,
         },
       });
 
       const response = await result.response;
-      const content = JSON.parse(response.text() || '{}');
+      let responseText = response.text() || '{}';
+      
+      // Clean any markdown code block wrappers
+      responseText = responseText.replace(/```json\s*|\s*```/g, '').trim();
+      
+      console.log("AI Generated Listening Content:", responseText.substring(0, 500) + "...");
+      const content = JSON.parse(responseText);
 
       return {
         success: true,
