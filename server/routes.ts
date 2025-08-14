@@ -145,7 +145,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Always generate content when uploading audio files
       if (req.file) {
         // Read audio file and transcribe
-        const fs = require('fs');
         const audioFilePath = req.file.path;
         const audioBuffer = fs.readFileSync(audioFilePath);
         
