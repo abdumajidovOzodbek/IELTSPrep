@@ -350,50 +350,66 @@ export default function AdminDashboard() {
                     />
                   </div>
 
-                  {/* Section Uploads */}
+                  {/* Section Uploads - Simplified */}
                   <div className="space-y-4">
-                    <h3 className="font-semibold text-slate-900">Upload Audio Sections</h3>
+                    <div className="text-center mb-6">
+                      <h3 className="font-semibold text-slate-900 mb-2">Upload Audio Sections</h3>
+                      <p className="text-sm text-slate-600">
+                        Just upload the 4 audio files - AI will automatically generate titles, instructions, and questions
+                      </p>
+                    </div>
                     {[1, 2, 3, 4].map((sectionNum) => (
-                      <Card key={sectionNum} className="p-4">
+                      <Card key={sectionNum} className="p-4 hover:shadow-md transition-shadow">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                              <span className="text-sm font-semibold text-blue-600">{sectionNum}</span>
+                            </div>
+                            <div>
+                              <h4 className="font-medium text-slate-800">Section {sectionNum}</h4>
+                              <p className="text-xs text-slate-500">
+                                {sectionNum === 1 ? "Everyday conversation" :
+                                 sectionNum === 2 ? "Monologue/Talk" :
+                                 sectionNum === 3 ? "Academic conversation" :
+                                 "Academic lecture"}
+                              </p>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            AI Generated
+                          </Badge>
+                        </div>
+
                         <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-medium text-slate-800">Section {sectionNum}</h4>
-                            <Badge variant="outline" className="text-xs">
-                              {sectionNum === 1 ? "Everyday conversation" :
-                               sectionNum === 2 ? "Monologue/Talk" :
-                               sectionNum === 3 ? "Academic conversation" :
-                               "Academic lecture"}
-                            </Badge>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                              <Label htmlFor={`section-${sectionNum}-title`} className="text-xs">Section Title</Label>
-                              <Input
-                                id={`section-${sectionNum}-title`}
-                                placeholder={`Section ${sectionNum} - ${sectionNum === 1 ? 'Booking Conversation' : sectionNum === 2 ? 'Campus Tour' : sectionNum === 3 ? 'Study Group' : 'Academic Lecture'}`}
-                                className="text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor={`section-${sectionNum}-audio`} className="text-xs">Audio File</Label>
-                              <Input
-                                id={`section-${sectionNum}-audio`}
-                                type="file"
-                                accept="audio/*"
-                                className="text-sm"
-                              />
-                            </div>
-                          </div>
-
                           <div>
-                            <Label htmlFor={`section-${sectionNum}-instructions`} className="text-xs">Instructions</Label>
-                            <Textarea
-                              id={`section-${sectionNum}-instructions`}
-                              placeholder={`Instructions for Section ${sectionNum}...`}
-                              className="text-sm"
-                              rows={2}
+                            <Label htmlFor={`section-${sectionNum}-audio`} className="text-sm font-medium">
+                              Audio File <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                              id={`section-${sectionNum}-audio`}
+                              type="file"
+                              accept="audio/mp3,audio/wav,audio/m4a,audio/ogg"
+                              className="mt-1"
+                              required
                             />
+                            <p className="text-xs text-slate-500 mt-1">
+                              Supported: MP3, WAV, M4A, OGG (max 100MB)
+                            </p>
+                          </div>
+                          
+                          <div className="bg-blue-50 p-3 rounded-lg">
+                            <div className="flex items-start space-x-2">
+                              <Sparkles className="h-4 w-4 text-blue-600 mt-0.5" />
+                              <div className="text-xs text-blue-700">
+                                <p className="font-medium mb-1">AI will automatically generate:</p>
+                                <ul className="list-disc list-inside space-y-0.5 text-blue-600">
+                                  <li>Section title and description</li>
+                                  <li>Listening instructions</li>
+                                  <li>Audio transcript</li>
+                                  <li>IELTS-style questions (10-11 per section)</li>
+                                </ul>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </Card>
@@ -402,13 +418,12 @@ export default function AdminDashboard() {
 
                   <Button
                     onClick={() => {
-                      // Handle complete test creation with all sections
                       handleCreateCompleteTest();
                     }}
                     disabled={!newTestData.title || isUploading}
                     className="w-full"
                   >
-                    {isUploading ? "Creating Test..." : "Create Complete Test with All Sections"}
+                    {isUploading ? "Uploading & Generating..." : "Upload Audio Files & Let AI Create Test"}
                   </Button>
                 </div>
               </DialogContent>
@@ -860,42 +875,14 @@ export default function AdminDashboard() {
                                 Your browser does not support the audio element.
                               </audio>
                               
-                              <div className="flex space-x-2">
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button variant="outline" size="sm" className="flex-1">
-                                      <Sparkles className="h-4 w-4 mr-1" />
-                                      Generate Questions
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent>
-                                    <DialogHeader>
-                                      <DialogTitle>Generate AI Questions</DialogTitle>
-                                    </DialogHeader>
-                                    <div className="space-y-4">
-                                      <div>
-                                        <Label htmlFor="transcript">Audio Transcript (Optional)</Label>
-                                        <Textarea
-                                          id="transcript"
-                                          placeholder="Provide transcript to improve question generation..."
-                                          value={transcript}
-                                          onChange={(e) => setTranscript(e.target.value)}
-                                          className="mt-1"
-                                        />
-                                        <p className="text-xs text-slate-500 mt-1">
-                                          AI will generate better questions with a transcript
-                                        </p>
-                                      </div>
-                                      <Button
-                                        onClick={() => handleGenerateQuestions(audio._id, audio.transcript)}
-                                        disabled={generateQuestionsMutation.isPending}
-                                        className="w-full"
-                                      >
-                                        {generateQuestionsMutation.isPending ? "Generating..." : "Generate Questions"}
-                                      </Button>
-                                    </div>
-                                  </DialogContent>
-                                </Dialog>
+                              <div className="text-center">
+                                <Badge variant="secondary" className="text-xs">
+                                  <Sparkles className="h-3 w-3 mr-1" />
+                                  Questions Auto-Generated
+                                </Badge>
+                                <p className="text-xs text-slate-500 mt-1">
+                                  AI automatically creates questions when audio is uploaded to a test
+                                </p>
                               </div>
                             </div>
                           </CardContent>

@@ -1,4 +1,3 @@
-
 import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
@@ -6,16 +5,16 @@ import { storage } from "./storage";
 import { geminiService as openaiService } from "./services/openai";
 import { ScoringService } from "./lib/scoring";
 import { rawScoreToBand, calculateOverallBand } from "./lib/band-mapping";
-import { 
-  insertTestSessionSchema, 
-  insertTestAnswerSchema, 
+import {
+  insertTestSessionSchema,
+  insertTestAnswerSchema,
   insertAiEvaluationSchema,
   insertAudioRecordingSchema,
   insertAudioFileSchema,
   insertTestQuestionSchema,
   insertListeningTestSchema,
   insertListeningSectionSchema,
-  TestSectionEnum 
+  TestSectionEnum
 } from "@shared/schema";
 import rateLimit from "express-rate-limit";
 import multer from "multer";
@@ -111,7 +110,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/listening-tests/:testId/sections/:sectionNumber/audio", audioUpload.single("audio"), async (req, res) => {
     try {
       const { testId, sectionNumber } = req.params;
-      
+      const { generateContent } = req.body; // Check if AI content generation is requested
+
       if (!req.file) {
         return res.status(400).json({ error: "No audio file provided" });
       }
@@ -138,35 +138,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const audioFile = await storage.createAudioFile(audioFileData);
 
-      // Create section if it doesn't exist
+      let sectionTitle = req.body.sectionTitle || `Section ${sectionNum}`;
+      let instructions = req.body.instructions || `Listen to the audio and answer the questions for Section ${sectionNum}`;
+      let questions = [];
+
+      if (generateContent && req.file) {
+        // Transcribe audio
+        const transcriptionResult = await openaiService.transcribeAudio(req.file.buffer);
+        if (!transcriptionResult.success) {
+          throw new Error(`Transcription failed: ${transcriptionResult.error}`);
+        }
+        const transcript = transcriptionResult.data.text;
+
+        // Generate section title and instructions
+        const contentGenerationPrompt = `Based on the following transcript, generate a concise and engaging title for this listening section and clear instructions for the user on how to answer the questions. Also, generate 5 IELTS-style listening questions of varying types (multiple choice, fill-in-the-blank, matching, map/diagram labeling).
+
+Transcript: "${transcript}"
+
+Return a JSON object with the following structure:
+{
+  "sectionTitle": "Generated Title",
+  "instructions": "Generated Instructions",
+  "questions": [
+    {
+      "questionType": "multiple_choice",
+      "question": "Question text",
+      "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"],
+      "correctAnswer": "B",
+      "orderIndex": 1
+    },
+    {
+      "questionType": "fill_blank",
+      "question": "Fill in the blank: The meeting will be held on _______.",
+      "correctAnswer": "Tuesday",
+      "orderIndex": 2
+    },
+    {
+      "questionType": "matching",
+      "question": "Match the following speakers to their roles:",
+      "options": {
+        "Speaker 1": "Student",
+        "Speaker 2": "Professor",
+        "Speaker 3": "Librarian"
+      },
+      "correctAnswer": {"Speaker 1": "Student", "Speaker 2": "Professor", "Speaker 3": "Librarian"},
+      "orderIndex": 3
+    },
+    {
+      "questionType": "map_labeling",
+      "question": "Label the rooms on the map:",
+      "options": {
+        "Room 101": "Lecture Hall",
+        "Room 102": "Study Area",
+        "Room 103": "Cafeteria"
+      },
+      "correctAnswer": {"Room 101": "Lecture Hall", "Room 102": "Study Area", "Room 103": "Cafeteria"},
+      "orderIndex": 4
+    }
+  ]
+}
+`;
+        const aiResponse = await openaiService.generateText(contentGenerationPrompt);
+        if (!aiResponse.success) {
+          throw new Error(`AI content generation failed: ${aiResponse.error}`);
+        }
+
+        let generatedContent;
+        try {
+          generatedContent = JSON.parse(aiResponse.data!.text);
+          sectionTitle = generatedContent.sectionTitle;
+          instructions = generatedContent.instructions;
+          questions = generatedContent.questions;
+        } catch (parseError) {
+          console.error("Failed to parse AI generated content:", parseError);
+          throw new Error("Failed to parse AI generated content.");
+        }
+      }
+
+
+      // Create section with generated or provided content
       const sectionData = insertListeningSectionSchema.parse({
         testId: new ObjectId(testId),
         sectionNumber: sectionNum,
-        title: req.body.sectionTitle || `Section ${sectionNum}`,
-        instructions: req.body.instructions || `Listen to the audio and answer the questions for Section ${sectionNum}`,
+        title: sectionTitle,
+        instructions: instructions,
         audioFileId: audioFile._id!,
         questions: []
       });
 
       const section = await storage.createListeningSection(sectionData);
 
-      // Update test with section reference
-      const sections = await storage.getTestSections(testId);
-      await storage.updateListeningTest(testId, {
-        sections: sections.map(s => s._id!),
-        status: sections.length === 4 ? "active" : "draft"
+      // Save generated questions
+      const savedQuestions = [];
+      for (const qData of questions) {
+        const questionSchema = insertTestQuestionSchema.parse({
+          section: "listening",
+          questionType: qData.questionType,
+          content: {
+            question: qData.question,
+            options: qData.options
+          },
+          correctAnswers: Array.isArray(qData.correctAnswer) ? qData.correctAnswer : [qData.correctAnswer],
+          orderIndex: qData.orderIndex,
+          audioFileId: audioFile._id!,
+          generatedBy: "ai"
+        });
+        const savedQuestion = await storage.createTestQuestion(questionSchema);
+        savedQuestions.push(savedQuestion);
+      }
+
+      // Update section with generated questions
+      await storage.updateListeningSection(section._id!.toString(), {
+        questions: savedQuestions.map(q => q._id!)
       });
-      
+
+      // Update test with section reference
+      const existingSections = await storage.getTestSections(testId);
+      const updatedSections = [...existingSections, section];
+
+      await storage.updateListeningTest(testId, {
+        sections: updatedSections.map(s => s._id!),
+        status: updatedSections.length === 4 ? "active" : "draft"
+      });
+
       res.json({
-        message: "Audio uploaded successfully for section",
+        message: "Audio uploaded and content generated successfully for section",
         audioFile: {
           id: audioFile._id,
           filename: audioFile.filename,
           originalName: audioFile.originalName,
           sectionNumber: audioFile.sectionNumber
         },
-        section,
-        testComplete: sections.length === 4
+        section: {
+          ...section,
+          questions: savedQuestions
+        },
+        testComplete: updatedSections.length === 4
       });
     } catch (error: any) {
       console.error("Section audio upload error:", error);
@@ -179,7 +286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { testId } = req.params;
       const sections = await storage.getTestSections(testId);
-      
+
       // Get audio files for each section
       const sectionsWithAudio = await Promise.all(
         sections.map(async (section) => {
@@ -213,7 +320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const audioFile = await storage.createAudioFile(audioFileData);
-      
+
       res.json({
         message: "Audio file uploaded successfully",
         audioFile: {
@@ -239,12 +346,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Generate questions for uploaded audio using AI
+  // Generate questions for uploaded audio using AI (this endpoint might be redundant now if generation happens on upload)
   app.post("/api/admin/audio/:audioId/generate-questions", aiRateLimit, async (req, res) => {
     try {
       const { audioId } = req.params;
       const audioFile = await storage.getAudioFile(audioId);
-      
+
       if (!audioFile) {
         return res.status(404).json({ error: "Audio file not found" });
       }
@@ -252,8 +359,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // First, get transcript if not already available
       let transcript = audioFile.transcript;
       if (!transcript) {
-        // In a real implementation, you'd transcribe the audio here
-        // For now, we'll ask admin to provide it or use a placeholder
+        // This part assumes transcription is done separately or via the upload endpoint
+        // For now, we'll ask admin to provide it or use a placeholder if generation is not triggered
         transcript = req.body.transcript || "Please provide transcript for better question generation";
       }
 
@@ -280,7 +387,7 @@ Return a JSON array with this format:
 ]`;
 
       const aiResponse = await openaiService.generateText(questionsPrompt);
-      
+
       if (!aiResponse.success) {
         return res.status(500).json({ error: aiResponse.error });
       }
@@ -362,7 +469,7 @@ Return a JSON array with this format:
   app.get("/api/questions/:section", async (req, res) => {
     try {
       const section = TestSectionEnum.parse(req.params.section);
-      
+
       if (section === "listening") {
         // Get a random complete listening test
         const randomTest = await storage.getRandomListeningTest();
@@ -372,13 +479,13 @@ Return a JSON array with this format:
 
         // Get all sections for this test
         const sections = await storage.getTestSections(randomTest._id!.toString());
-        
+
         // Get questions and audio for each section
         const sectionsWithData = await Promise.all(
           sections.map(async (section) => {
             const audioFile = await storage.getAudioFile(section.audioFileId.toString());
             const questions = await storage.getQuestionsByAudioFile(section.audioFileId.toString());
-            
+
             return {
               sectionNumber: section.sectionNumber,
               title: section.title,
@@ -436,22 +543,22 @@ Return a JSON array with this format:
     try {
       const { sessionId } = req.params;
       const section = TestSectionEnum.parse(req.params.section);
-      
+
       const answers = await storage.getSessionAnswers(sessionId);
       const questions = await storage.getTestQuestions(section);
-      
-      const sectionAnswers = answers.filter(a => 
+
+      const sectionAnswers = answers.filter(a =>
         questions.some(q => q._id!.toString() === a.questionId)
       );
 
       if (section === 'listening' || section === 'reading') {
         const result = ScoringService.scoreObjectiveAnswers(sectionAnswers, questions);
         const band = rawScoreToBand(result.rawScore, section);
-        
+
         // Update session with band score
         const updateField = section === 'listening' ? { listeningBand: band } : { readingBand: band };
         await storage.updateTestSession(sessionId, updateField);
-        
+
         res.json({ ...result, band });
       } else {
         res.status(400).json({ error: "Use AI evaluation endpoints for writing/speaking" });
@@ -465,9 +572,9 @@ Return a JSON array with this format:
   app.get("/api/ai/health", aiRateLimit, async (req, res) => {
     try {
       const healthCheck = await openaiService.generateText("Test connection");
-      res.json({ 
+      res.json({
         status: healthCheck.success ? "operational" : "error",
-        message: healthCheck.error || "AI service is operational" 
+        message: healthCheck.error || "AI service is operational"
       });
     } catch (error: any) {
       res.status(500).json({ status: "error", message: error.message });
@@ -477,13 +584,13 @@ Return a JSON array with this format:
   app.post("/api/ai/evaluate/writing", aiRateLimit, async (req, res) => {
     try {
       const { sessionId, questionId, candidateText, prompt } = req.body;
-      
+
       if (!sessionId || !candidateText) {
         return res.status(400).json({ error: "Missing required fields" });
       }
 
       const evaluation = await openaiService.evaluateWriting(prompt || "", candidateText);
-      
+
       if (!evaluation.success) {
         return res.status(500).json({ error: evaluation.error });
       }
@@ -500,10 +607,10 @@ Return a JSON array with this format:
       });
 
       const storedEvaluation = await storage.createAiEvaluation(evaluationData);
-      
+
       // Update session with writing band
-      await storage.updateTestSession(sessionId, { 
-        writingBand: evaluation.data!.overallWritingBand 
+      await storage.updateTestSession(sessionId, {
+        writingBand: evaluation.data!.overallWritingBand
       });
 
       res.json({
@@ -518,13 +625,13 @@ Return a JSON array with this format:
   app.post("/api/ai/evaluate/speaking", aiRateLimit, async (req, res) => {
     try {
       const { sessionId, transcript, audioFeatures } = req.body;
-      
+
       if (!sessionId || !transcript) {
         return res.status(400).json({ error: "Missing required fields" });
       }
 
       const evaluation = await openaiService.evaluateSpeaking(transcript, audioFeatures);
-      
+
       if (!evaluation.success) {
         return res.status(500).json({ error: evaluation.error });
       }
@@ -541,10 +648,10 @@ Return a JSON array with this format:
       });
 
       const storedEvaluation = await storage.createAiEvaluation(evaluationData);
-      
+
       // Update session with speaking band
-      await storage.updateTestSession(sessionId, { 
-        speakingBand: evaluation.data!.overallSpeakingBand 
+      await storage.updateTestSession(sessionId, {
+        speakingBand: evaluation.data!.overallSpeakingBand
       });
 
       res.json({
@@ -564,7 +671,7 @@ Return a JSON array with this format:
       }
 
       const transcription = await openaiService.transcribeAudio(req.file.buffer);
-      
+
       if (!transcription.success) {
         return res.status(500).json({ error: transcription.error });
       }
@@ -579,14 +686,14 @@ Return a JSON array with this format:
   app.post("/api/recordings", upload.single("audio"), async (req, res) => {
     try {
       const { sessionId, section } = req.body;
-      
+
       if (!req.file || !sessionId || !section) {
         return res.status(400).json({ error: "Missing required fields" });
       }
 
       // In a real implementation, you'd save the audio file to storage (S3, etc.)
       const audioUrl = `/recordings/${Date.now()}-${req.file.originalname}`;
-      
+
       const recordingData = insertAudioRecordingSchema.parse({
         sessionId,
         section,
@@ -626,7 +733,7 @@ Return a JSON array with this format:
       const sessions = await storage.getAllTestSessions();
       const completedSessions = sessions.filter(s => s.status === "completed");
       const audioFiles = await storage.getAllAudioFiles();
-      
+
       const stats = {
         totalSessions: sessions.length,
         completedSessions: completedSessions.length,
