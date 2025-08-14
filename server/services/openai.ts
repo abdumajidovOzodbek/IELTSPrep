@@ -422,70 +422,108 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
             questionTypes = Array(10).fill("fill_blank");
         }
 
-        const contentGenerationPrompt = `You are an expert IELTS test developer. Carefully analyze this audio transcript to create exactly 10 authentic IELTS listening questions for ${sectionDescription}.
+        const contentGenerationPrompt = `You are an expert IELTS test developer. Generate exactly 10 authentic IELTS listening questions for ${sectionDescription}.
 
-TRANSCRIPT ANALYSIS REQUIRED:
+TRANSCRIPT TO ANALYZE:
 "${section.transcript}"
 
-CRITICAL INSTRUCTIONS:
-1. Read the transcript carefully and identify key information: names, numbers, dates, places, actions, opinions, reasons, processes
-2. Generate EXACTLY 10 questions that test different aspects mentioned in the transcript
-3. Each question MUST be answerable from the transcript content
-4. Use the specified question types in order: ${questionTypes.join(", ")}
+SECTION ${sectionNum} REQUIREMENTS:
+${sectionNum === 1 ? `
+- FORM COMPLETION QUESTIONS (Questions 1-5): Create a realistic form (booking, registration, application)
+- MULTIPLE CHOICE QUESTIONS (Questions 6-7): 4 options each (A, B, C, D)
+- SHORT ANSWER QUESTIONS (Questions 8-10): Fill in the blank format
+` : `
+- All questions should be short answer/fill in the blank format
+- Test specific details from the transcript
+- Use "______" to indicate where answers should be filled
+`}
 
-QUESTION DIFFICULTY PROGRESSION:
-- Questions 1-3: Direct factual information (clearly stated details)
-- Questions 4-7: Moderate difficulty (require careful listening, may involve paraphrasing)  
-- Questions 8-10: Challenging (inference, detailed understanding, multiple details)
+FOR FORM COMPLETION QUESTIONS (Section 1 only):
+- Create a realistic form context (hotel booking, course registration, apartment rental, etc.)
+- Each form field should be: "Field Label: _______"
+- Extract EXACT answers from the transcript
+- Use common form fields: Name, Address, Phone, Email, Date, Price, etc.
 
-QUESTION TYPE SPECIFICATIONS:
-- form_completion: Create realistic form fields EXACTLY as they appear in IELTS Section 1. Each question must be a complete form field with label and blank space.
-- multiple_choice: Create 4 realistic options (A, B, C, D) with ONLY ONE correct answer from transcript
-- fill_blank: Use words/phrases/numbers that are clearly spoken in the audio (max 3 words)
+CRITICAL: For form_completion questions, you MUST include proper formContext structure.
 
-FORM COMPLETION FORMAT (CRITICAL):
-For form_completion questions, create realistic form contexts like:
-- Personal information forms (registration, application, booking)
-- Each question should be formatted as: "Field Label: _______"
-- Extract exact answers from the transcript that would complete each form field
-- Common form fields: Name, Address, Phone number, Email, Date of birth, Occupation, etc.
-
-ANSWER REQUIREMENTS:
-- All answers must be directly extractable from the transcript
-- For form_completion: Use exact words/numbers from transcript that complete the form field
-- For fill_blank: Use exact words/numbers from transcript (max 3 words)
-- For multiple_choice: Correct option must match transcript information exactly
-
-Return JSON format with this EXACT structure:
+Return JSON with this EXACT structure:
 {
-  "sectionTitle": "Appropriate title for ${sectionDescription}",
+  "sectionTitle": "Descriptive title for this section",
   "instructions": "${sectionNum === 1 ? 'Complete the form below. Write NO MORE THAN THREE WORDS AND/OR A NUMBER for each answer.' : `Listen to the ${sectionNum === 2 || sectionNum === 4 ? 'talk' : 'discussion'} and answer Questions ${(sectionNum-1)*10 + 1}-${sectionNum*10}. Write NO MORE THAN THREE WORDS AND/OR A NUMBER for each answer.`}",
-  "formTitle": "${sectionNum === 1 ? 'Registration Form' : 'N/A'}",
   "questions": [
+    ${sectionNum === 1 ? `
     {
       "questionType": "form_completion",
       "question": "First name: _______",
       "correctAnswer": "John",
       "orderIndex": 1,
       "formContext": {
-        "formTitle": "Registration Form",
+        "formTitle": "Application Form",
         "fieldLabel": "First name",
         "fieldType": "text"
       }
     },
     {
-      "questionType": "form_completion", 
-      "question": "Telephone number: _______",
-      "correctAnswer": "0207 123 4567",
+      "questionType": "form_completion",
+      "question": "Surname: _______", 
+      "correctAnswer": "Smith",
       "orderIndex": 2,
       "formContext": {
-        "formTitle": "Registration Form",
-        "fieldLabel": "Telephone number",
+        "formTitle": "Application Form",
+        "fieldLabel": "Surname",
         "fieldType": "text"
       }
-    }
+    },
+    {
+      "questionType": "form_completion",
+      "question": "Phone number: _______",
+      "correctAnswer": "07123456789",
+      "orderIndex": 3,
+      "formContext": {
+        "formTitle": "Application Form", 
+        "fieldLabel": "Phone number",
+        "fieldType": "text"
+      }
+    },
+    {
+      "questionType": "form_completion",
+      "question": "Email address: _______",
+      "correctAnswer": "john@email.com",
+      "orderIndex": 4,
+      "formContext": {
+        "formTitle": "Application Form",
+        "fieldLabel": "Email address", 
+        "fieldType": "text"
+      }
+    },
+    {
+      "questionType": "form_completion",
+      "question": "Preferred date: _______",
+      "correctAnswer": "15th March",
+      "orderIndex": 5,
+      "formContext": {
+        "formTitle": "Application Form",
+        "fieldLabel": "Preferred date",
+        "fieldType": "text"
+      }
+    },
+    {
+      "questionType": "multiple_choice",
+      "question": "What is the main reason for the inquiry?",
+      "options": ["A) Option from transcript", "B) Option from transcript", "C) Option from transcript", "D) Option from transcript"],
+      "correctAnswer": "A",
+      "orderIndex": 6
+    }` : `
+    {
+      "questionType": "fill_blank",
+      "question": "The speaker mentions that _______ is important.",
+      "correctAnswer": "timing",
+      "orderIndex": 1
+    }`}
   ]
-}`;
+}
+
+IMPORTANT: Analyze the transcript and extract REAL information to create authentic questions. Replace example values with actual content from the transcript.`;
 
         const questionGenerationResult = await this.model.generateContent({
           contents: [{ role: "user", parts: [{ text: contentGenerationPrompt }] }],
