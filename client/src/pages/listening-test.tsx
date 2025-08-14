@@ -97,15 +97,14 @@ export default function ListeningTestPage() {
   const audioUrl = currentSectionData?.audioUrl;
 
   const handleNext = () => {
-    if (currentQuestion < activeQuestions.length - 1) {
-      setCurrentQuestion(prev => prev + 1);
-    } else if (currentSection < allSections.length - 1) {
+    if (currentSection < allSections.length - 1) {
       // Move to next section
       setCurrentSection(prev => prev + 1);
       setCurrentQuestion(0);
     } else {
       // All sections complete, move to reading test
       updateSession({ currentSection: "reading" });
+      window.location.href = `/test/${sessionId}/reading`;
     }
   };
 
@@ -469,9 +468,8 @@ export default function ListeningTestPage() {
                         onClick={handleNext}
                         size="sm"
                         className="w-full flex items-center justify-center py-2 text-sm bg-primary hover:bg-primary/90"
-                        disabled={currentSection === allSections.length - 1}
                       >
-                        {currentSection === allSections.length - 1 ? "Complete" : "Next"}
+                        {currentSection === allSections.length - 1 ? "Complete Listening" : "Next"}
                         <ChevronRight className="h-4 w-4 ml-1" />
                       </Button>
                     </div>
