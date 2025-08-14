@@ -1,4 +1,3 @@
-
 import { z } from "zod";
 import { ObjectId } from "mongodb";
 
@@ -29,7 +28,37 @@ export const testSessionSchema = z.object({
   speakingBand: z.number().optional(),
 });
 
-// Audio file schema for admin uploads
+// Listening Test Structure Schema
+export const listeningTestSchema = z.object({
+  _id: z.instanceof(ObjectId).optional(),
+  title: z.string(),
+  description: z.string().optional(),
+  difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
+  status: z.enum(["draft", "active", "archived"]).default("draft"),
+  sections: z.array(z.instanceof(ObjectId)),
+  createdBy: z.string(),
+  createdAt: z.date().default(() => new Date()),
+  updatedAt: z.date().default(() => new Date())
+});
+
+export const insertListeningTestSchema = listeningTestSchema.omit({ _id: true, createdAt: true, updatedAt: true });
+
+// Listening Section Schema
+export const listeningSectionSchema = z.object({
+  _id: z.instanceof(ObjectId).optional(),
+  testId: z.instanceof(ObjectId),
+  sectionNumber: z.number().min(1).max(4),
+  title: z.string(),
+  instructions: z.string(),
+  audioFileId: z.instanceof(ObjectId),
+  questions: z.array(z.instanceof(ObjectId)),
+  duration: z.number().default(600), // 10 minutes default
+  createdAt: z.date().default(() => new Date())
+});
+
+export const insertListeningSectionSchema = listeningSectionSchema.omit({ _id: true, createdAt: true });
+
+// Audio Files Schema (for admin uploads)
 export const audioFileSchema = z.object({
   _id: z.instanceof(ObjectId).optional(),
   filename: z.string(),
@@ -38,10 +67,13 @@ export const audioFileSchema = z.object({
   size: z.number(),
   duration: z.number().optional(),
   transcript: z.string().optional(),
-  uploadedBy: z.string(), // admin user ID
-  uploadedAt: z.date().default(() => new Date()),
-  isActive: z.boolean().default(true),
+  sectionNumber: z.number().min(1).max(4).optional(),
+  testId: z.instanceof(ObjectId).optional(),
+  uploadedBy: z.string(),
+  uploadedAt: z.date().default(() => new Date())
 });
+
+export const insertAudioFileSchema = audioFileSchema.omit({ _id: true, uploadedAt: true });
 
 // Test question schema
 export const testQuestionSchema = z.object({
@@ -97,7 +129,6 @@ export const audioRecordingSchema = z.object({
 // Insert schemas (for validation before DB insert)
 export const insertUserSchema = userSchema.omit({ _id: true, createdAt: true });
 export const insertTestSessionSchema = testSessionSchema.omit({ _id: true, startTime: true });
-export const insertAudioFileSchema = audioFileSchema.omit({ _id: true, uploadedAt: true });
 export const insertTestQuestionSchema = testQuestionSchema.omit({ _id: true, createdAt: true });
 export const insertTestAnswerSchema = testAnswerSchema.omit({ _id: true, submittedAt: true });
 export const insertAiEvaluationSchema = aiEvaluationSchema.omit({ _id: true, evaluatedAt: true });
@@ -112,6 +143,10 @@ export type InsertTestSession = z.infer<typeof insertTestSessionSchema>;
 
 export type AudioFile = z.infer<typeof audioFileSchema>;
 export type InsertAudioFile = z.infer<typeof insertAudioFileSchema>;
+export type ListeningTest = z.infer<typeof listeningTestSchema>;
+export type InsertListeningTest = z.infer<typeof insertListeningTestSchema>;
+export type ListeningSection = z.infer<typeof listeningSectionSchema>;
+export type InsertListeningSection = z.infer<typeof insertListeningSectionSchema>;
 
 export type TestQuestion = z.infer<typeof testQuestionSchema>;
 export type InsertTestQuestion = z.infer<typeof insertTestQuestionSchema>;

@@ -13,6 +13,8 @@ import {
   insertAudioRecordingSchema,
   insertAudioFileSchema,
   insertTestQuestionSchema,
+  insertListeningTestSchema,
+  insertListeningSectionSchema,
   TestSectionEnum 
 } from "@shared/schema";
 import rateLimit from "express-rate-limit";
@@ -76,7 +78,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   app.use('/uploads', express.static('uploads'));
 
-  // Admin Audio Upload Endpoints
+  // Create new listening test
+  app.post("/api/admin/listening-tests", async (req, res) => {
+    try {
+      const testData = insertListeningTestSchema.parse({
+        ...req.body,
+        createdBy: "admin",
+        sections: []
+      });
+
+      const test = await storage.createListeningTest(testData);
+      res.json({
+        message: "Listening test created successfully",
+        test
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get all listening tests
+  app.get("/api/admin/listening-tests", async (req, res) => {
+    try {
+      const tests = await storage.getAllListeningTests();
+      res.json(tests);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Upload audio for specific test and section
+  app.post("/api/admin/listening-tests/:testId/sections/:sectionNumber/audio", audioUpload.single("audio"), async (req, res) => {
+    try {
+      const { testId, sectionNumber } = req.params;
+      
+      if (!req.file) {
+        return res.status(400).json({ error: "No audio file provided" });
+      }
+
+      const test = await storage.getListeningTest(testId);
+      if (!test) {
+        return res.status(404).json({ error: "Listening test not found" });
+      }
+
+      const sectionNum = parseInt(sectionNumber);
+      if (sectionNum < 1 || sectionNum > 4) {
+        return res.status(400).json({ error: "Section number must be between 1 and 4" });
+      }
+
+      const audioFileData = insertAudioFileSchema.parse({
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+        sectionNumber: sectionNum,
+        testId: new ObjectId(testId),
+        uploadedBy: req.body.uploadedBy || "admin"
+      });
+
+      const audioFile = await storage.createAudioFile(audioFileData);
+
+      // Create section if it doesn't exist
+      const sectionData = insertListeningSectionSchema.parse({
+        testId: new ObjectId(testId),
+        sectionNumber: sectionNum,
+        title: req.body.sectionTitle || `Section ${sectionNum}`,
+        instructions: req.body.instructions || `Listen to the audio and answer the questions for Section ${sectionNum}`,
+        audioFileId: audioFile._id!,
+        questions: []
+      });
+
+      const section = await storage.createListeningSection(sectionData);
+
+      // Update test with section reference
+      const sections = await storage.getTestSections(testId);
+      await storage.updateListeningTest(testId, {
+        sections: sections.map(s => s._id!),
+        status: sections.length === 4 ? "active" : "draft"
+      });
+      
+      res.json({
+        message: "Audio uploaded successfully for section",
+        audioFile: {
+          id: audioFile._id,
+          filename: audioFile.filename,
+          originalName: audioFile.originalName,
+          sectionNumber: audioFile.sectionNumber
+        },
+        section,
+        testComplete: sections.length === 4
+      });
+    } catch (error: any) {
+      console.error("Section audio upload error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get test sections with audio files
+  app.get("/api/admin/listening-tests/:testId/sections", async (req, res) => {
+    try {
+      const { testId } = req.params;
+      const sections = await storage.getTestSections(testId);
+      
+      // Get audio files for each section
+      const sectionsWithAudio = await Promise.all(
+        sections.map(async (section) => {
+          const audioFile = await storage.getAudioFile(section.audioFileId.toString());
+          return {
+            ...section,
+            audioFile
+          };
+        })
+      );
+
+      res.json(sectionsWithAudio);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin Audio Upload Endpoints (keeping for backwards compatibility)
   app.post("/api/admin/audio/upload", audioUpload.single("audio"), async (req, res) => {
     try {
       if (!req.file) {
@@ -88,7 +209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         originalName: req.file.originalname,
         mimeType: req.file.mimetype,
         size: req.file.size,
-        uploadedBy: req.body.uploadedBy || "admin" // In a real app, get from auth
+        uploadedBy: req.body.uploadedBy || "admin"
       });
 
       const audioFile = await storage.createAudioFile(audioFileData);
@@ -237,33 +358,50 @@ Return a JSON array with this format:
     }
   });
 
-  // Modified: Get listening questions with random audio selection
+  // Modified: Get listening questions with random structured test selection
   app.get("/api/questions/:section", async (req, res) => {
     try {
       const section = TestSectionEnum.parse(req.params.section);
       
       if (section === "listening") {
-        // Get a random audio file
-        const randomAudio = await storage.getRandomAudioFile();
-        if (!randomAudio) {
-          return res.status(404).json({ error: "No audio files available" });
+        // Get a random complete listening test
+        const randomTest = await storage.getRandomListeningTest();
+        if (!randomTest) {
+          return res.status(404).json({ error: "No complete listening tests available" });
         }
 
-        // Get questions for this audio file
-        const questions = await storage.getQuestionsByAudioFile(randomAudio._id!.toString());
+        // Get all sections for this test
+        const sections = await storage.getTestSections(randomTest._id!.toString());
         
-        // Add audio URL to each question
-        const questionsWithAudio = questions.map(q => ({
-          ...q,
-          audioUrl: `/uploads/audio/${randomAudio.filename}`,
-          audioInfo: {
-            id: randomAudio._id,
-            originalName: randomAudio.originalName,
-            duration: randomAudio.duration
-          }
-        }));
+        // Get questions and audio for each section
+        const sectionsWithData = await Promise.all(
+          sections.map(async (section) => {
+            const audioFile = await storage.getAudioFile(section.audioFileId.toString());
+            const questions = await storage.getQuestionsByAudioFile(section.audioFileId.toString());
+            
+            return {
+              sectionNumber: section.sectionNumber,
+              title: section.title,
+              instructions: section.instructions,
+              audioUrl: audioFile ? `/uploads/audio/${audioFile.filename}` : null,
+              audioInfo: audioFile ? {
+                id: audioFile._id,
+                originalName: audioFile.originalName,
+                duration: audioFile.duration
+              } : null,
+              questions: questions.map(q => ({
+                ...q,
+                sectionNumber: section.sectionNumber
+              }))
+            };
+          })
+        );
 
-        res.json(questionsWithAudio);
+        res.json({
+          testId: randomTest._id,
+          testTitle: randomTest.title,
+          sections: sectionsWithData
+        });
       } else {
         const questions = await storage.getTestQuestions(section);
         res.json(questions);

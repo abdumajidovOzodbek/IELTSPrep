@@ -1,13 +1,14 @@
-
 import { MongoClient, Db, ObjectId } from "mongodb";
-import { 
+import {
   type User, type InsertUser,
   type TestSession, type InsertTestSession,
   type AudioFile, type InsertAudioFile,
   type TestQuestion, type InsertTestQuestion,
   type TestAnswer, type InsertTestAnswer,
   type AiEvaluation, type InsertAiEvaluation,
-  type AudioRecording, type InsertAudioRecording
+  type AudioRecording, type InsertAudioRecording,
+  type ListeningTest, type InsertListeningTest,
+  type ListeningSection
 } from "@shared/schema";
 
 export interface IStorage {
@@ -29,6 +30,7 @@ export interface IStorage {
   getAudioFile(id: string): Promise<AudioFile | undefined>;
   getAllAudioFiles(): Promise<AudioFile[]>;
   getRandomAudioFile(): Promise<AudioFile | undefined>;
+  getAudioFilesByTest(testId: string): Promise<AudioFile[]>;
 
   // Test Questions
   createTestQuestion(question: InsertTestQuestion): Promise<TestQuestion>;
@@ -49,6 +51,18 @@ export interface IStorage {
   // Audio Recordings
   createAudioRecording(recording: InsertAudioRecording): Promise<AudioRecording>;
   getSessionRecordings(sessionId: string): Promise<AudioRecording[]>;
+
+  // Listening Tests
+  createListeningTest(data: InsertListeningTest): Promise<ListeningTest>;
+  getListeningTest(id: string): Promise<ListeningTest | undefined>;
+  getAllListeningTests(): Promise<ListeningTest[]>;
+  updateListeningTest(id: string, updates: Partial<ListeningTest>): Promise<ListeningTest | undefined>;
+  getRandomListeningTest(): Promise<ListeningTest | undefined>;
+
+  // Listening Sections
+  createListeningSection(data: InsertListeningSection): Promise<ListeningSection>;
+  getListeningSection(id: string): Promise<ListeningSection | undefined>;
+  getTestSections(testId: string): Promise<ListeningSection[]>;
 }
 
 export class MongoStorage implements IStorage {
@@ -156,6 +170,19 @@ export class MongoStorage implements IStorage {
     return audioFiles.map(file => ({ ...file, _id: file._id } as AudioFile));
   }
 
+  async getAudioFilesByTest(testId: string): Promise<AudioFile[]> {
+    try {
+      const audioFiles = await this.db.collection("audioFiles").find({
+        testId: new ObjectId(testId),
+        isActive: true
+      }).sort({ sectionNumber: 1 }).toArray();
+      return audioFiles.map(file => ({ ...file, _id: file._id } as AudioFile));
+    } catch (error) {
+      return [];
+    }
+  }
+
+
   async getRandomAudioFile(): Promise<AudioFile | undefined> {
     const audioFiles = await this.db.collection("audioFiles").find({ isActive: true }).toArray();
     if (audioFiles.length === 0) return undefined;
@@ -172,9 +199,9 @@ export class MongoStorage implements IStorage {
   }
 
   async getTestQuestions(section: string): Promise<TestQuestion[]> {
-    const questions = await this.db.collection("testQuestions").find({ 
-      section, 
-      isActive: true 
+    const questions = await this.db.collection("testQuestions").find({
+      section,
+      isActive: true
     }).sort({ orderIndex: 1 }).toArray();
     return questions.map(question => ({ ...question, _id: question._id } as TestQuestion));
   }
@@ -203,9 +230,9 @@ export class MongoStorage implements IStorage {
 
   async getQuestionsByAudioFile(audioFileId: string): Promise<TestQuestion[]> {
     try {
-      const questions = await this.db.collection("testQuestions").find({ 
+      const questions = await this.db.collection("testQuestions").find({
         audioFileId: new ObjectId(audioFileId),
-        isActive: true 
+        isActive: true
       }).sort({ orderIndex: 1 }).toArray();
       return questions.map(question => ({ ...question, _id: question._id } as TestQuestion));
     } catch (error) {
@@ -252,6 +279,86 @@ export class MongoStorage implements IStorage {
   async getSessionRecordings(sessionId: string): Promise<AudioRecording[]> {
     const recordings = await this.db.collection("audioRecordings").find({ sessionId }).toArray();
     return recordings.map(recording => ({ ...recording, _id: recording._id } as AudioRecording));
+  }
+
+  // Listening Tests
+  async createListeningTest(data: InsertListeningTest): Promise<ListeningTest> {
+    const result = await this.db.collection('listeningTests').insertOne({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    return { ...data, _id: result.insertedId, createdAt: new Date(), updatedAt: new Date() };
+  }
+
+  async getListeningTest(id: string): Promise<ListeningTest | undefined> {
+    try {
+      const test = await this.db.collection('listeningTests').findOne({ _id: new ObjectId(id) });
+      return test ? { ...test, _id: test._id } as ListeningTest : undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  async getAllListeningTests(): Promise<ListeningTest[]> {
+    const tests = await this.db.collection('listeningTests').find({}).sort({ createdAt: -1 }).toArray();
+    return tests.map(test => ({ ...test, _id: test._id } as ListeningTest));
+  }
+
+  async updateListeningTest(id: string, updates: Partial<ListeningTest>): Promise<ListeningTest | undefined> {
+    try {
+      const result = await this.db.collection('listeningTests').findOneAndUpdate(
+        { _id: new ObjectId(id) },
+        { $set: { ...updates, updatedAt: new Date() } },
+        { returnDocument: 'after' }
+      );
+      return result ? { ...result, _id: result._id } as ListeningTest : undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  async getRandomListeningTest(): Promise<ListeningTest | undefined> {
+    const pipeline = [
+      { $match: { status: "active" } },
+      { $sample: { size: 1 } }
+    ];
+    try {
+      const result = await this.db.collection('listeningTests').aggregate(pipeline).toArray();
+      return result.length > 0 ? { ...result[0], _id: result[0]._id } as ListeningTest : undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  // Listening Sections
+  async createListeningSection(data: InsertListeningSection): Promise<ListeningSection> {
+    const result = await this.db.collection('listeningSections').insertOne({
+      ...data,
+      createdAt: new Date()
+    });
+    return { ...data, _id: result.insertedId, createdAt: new Date() };
+  }
+
+  async getListeningSection(id: string): Promise<ListeningSection | undefined> {
+    try {
+      const section = await this.db.collection('listeningSections').findOne({ _id: new ObjectId(id) });
+      return section ? { ...section, _id: section._id } as ListeningSection : undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  async getTestSections(testId: string): Promise<ListeningSection[]> {
+    try {
+      const sections = await this.db.collection('listeningSections')
+        .find({ testId: new ObjectId(testId) })
+        .sort({ sectionNumber: 1 })
+        .toArray();
+      return sections.map(section => ({ ...section, _id: section._id } as ListeningSection));
+    } catch (error) {
+      return [];
+    }
   }
 }
 

@@ -35,6 +35,16 @@ export default function AdminDashboard() {
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [transcript, setTranscript] = useState("");
+  const [currentTest, setCurrentTest] = useState<any>(null);
+  const [newTestData, setNewTestData] = useState({
+    title: "",
+    description: "",
+    difficulty: "intermediate"
+  });
+  const [sectionData, setSectionData] = useState({
+    sectionTitle: "",
+    instructions: ""
+  });
 
   const { data: stats } = useQuery({
     queryKey: ["/api/admin/stats"],
@@ -46,6 +56,10 @@ export default function AdminDashboard() {
 
   const { data: audioFiles = [] } = useQuery({
     queryKey: ["/api/admin/audio/list"],
+  });
+
+  const { data: listeningTests = [] } = useQuery({
+    queryKey: ["/api/admin/listening-tests"],
   });
 
   // Upload audio file mutation
@@ -85,6 +99,70 @@ export default function AdminDashboard() {
       });
       setIsUploading(false);
       setUploadProgress(0);
+    },
+  });
+
+  // Create listening test mutation
+  const createTestMutation = useMutation({
+    mutationFn: async (testData: any) => {
+      const response = await apiRequest("POST", "/api/admin/listening-tests", testData);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Test Created",
+        description: "Listening test created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/listening-tests"] });
+      setNewTestData({ title: "", description: "", difficulty: "intermediate" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Creation Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Upload section audio mutation
+  const uploadSectionAudioMutation = useMutation({
+    mutationFn: async ({ testId, sectionNumber, file, sectionTitle, instructions }: any) => {
+      const formData = new FormData();
+      formData.append("audio", file);
+      formData.append("sectionTitle", sectionTitle);
+      formData.append("instructions", instructions);
+      formData.append("uploadedBy", "admin");
+
+      const response = await fetch(`/api/admin/listening-tests/${testId}/sections/${sectionNumber}/audio`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Section Uploaded",
+        description: data.testComplete ? "All 4 sections completed! Test is now active." : `Section ${data.audioFile.sectionNumber} uploaded successfully`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/listening-tests"] });
+      setSelectedFile(null);
+      setSectionData({ sectionTitle: "", instructions: "" });
+      if (data.testComplete) {
+        setCurrentTest(null);
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Upload Failed",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -296,6 +374,7 @@ export default function AdminDashboard() {
         <Tabs defaultValue="sessions" className="space-y-6">
           <TabsList>
             <TabsTrigger value="sessions">Test Sessions</TabsTrigger>
+            <TabsTrigger value="listening-tests">Listening Tests</TabsTrigger>
             <TabsTrigger value="audio">Audio Management</TabsTrigger>
           </TabsList>
 
@@ -407,6 +486,212 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="listening-tests">
+            {/* Listening Tests Management */}
+            <div className="space-y-6">
+              {/* Create New Test */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Create New Listening Test</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="test-title">Test Title</Label>
+                      <Input
+                        id="test-title"
+                        placeholder="e.g., IELTS Practice Test 1"
+                        value={newTestData.title}
+                        onChange={(e) => setNewTestData(prev => ({ ...prev, title: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="test-description">Description</Label>
+                      <Input
+                        id="test-description"
+                        placeholder="Test description"
+                        value={newTestData.description}
+                        onChange={(e) => setNewTestData(prev => ({ ...prev, description: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="difficulty">Difficulty</Label>
+                      <Select
+                        value={newTestData.difficulty}
+                        onValueChange={(value) => setNewTestData(prev => ({ ...prev, difficulty: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="beginner">Beginner</SelectItem>
+                          <SelectItem value="intermediate">Intermediate</SelectItem>
+                          <SelectItem value="advanced">Advanced</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => createTestMutation.mutate(newTestData)}
+                    disabled={!newTestData.title || createTestMutation.isPending}
+                    className="mt-4"
+                  >
+                    {createTestMutation.isPending ? "Creating..." : "Create Test"}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Existing Tests */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Listening Tests</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {listeningTests.length === 0 ? (
+                      <div className="text-center py-8">
+                        <ClipboardList className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                        <p className="text-slate-600">No listening tests created yet</p>
+                        <p className="text-sm text-slate-500">Create your first listening test above</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {listeningTests.map((test: any) => (
+                          <Card key={test._id} className="hover:shadow-md transition-shadow">
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <h3 className="font-semibold text-slate-900">{test.title}</h3>
+                                <Badge
+                                  variant={test.status === 'active' ? 'default' : test.status === 'draft' ? 'secondary' : 'outline'}
+                                  className={
+                                    test.status === 'active' ? 'bg-green-100 text-green-800' :
+                                    test.status === 'draft' ? 'bg-yellow-100 text-yellow-800' : ''
+                                  }
+                                >
+                                  {test.status}
+                                </Badge>
+                              </div>
+                              
+                              {test.description && (
+                                <p className="text-sm text-slate-600 mb-3">{test.description}</p>
+                              )}
+
+                              <div className="flex items-center justify-between text-sm text-slate-500 mb-4">
+                                <span>Sections: {test.sections?.length || 0}/4</span>
+                                <span>{test.difficulty}</span>
+                              </div>
+
+                              <div className="grid grid-cols-4 gap-2 mb-4">
+                                {[1, 2, 3, 4].map((sectionNum) => {
+                                  const hasSection = test.sections?.length >= sectionNum;
+                                  return (
+                                    <div
+                                      key={sectionNum}
+                                      className={`text-center p-2 rounded text-xs font-medium ${
+                                        hasSection
+                                          ? 'bg-green-100 text-green-800'
+                                          : 'bg-slate-100 text-slate-500'
+                                      }`}
+                                    >
+                                      Section {sectionNum}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              <div className="flex space-x-2">
+                                {test.status === 'draft' && (
+                                  <Dialog>
+                                    <DialogTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentTest(test)}
+                                      >
+                                        <Upload className="h-4 w-4 mr-1" />
+                                        Upload Section
+                                      </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="max-w-md">
+                                      <DialogHeader>
+                                        <DialogTitle>Upload Section Audio</DialogTitle>
+                                      </DialogHeader>
+                                      <div className="space-y-4">
+                                        <div>
+                                          <Label>Current Test: {test.title}</Label>
+                                          <p className="text-xs text-slate-500">
+                                            Next section: {(test.sections?.length || 0) + 1}/4
+                                          </p>
+                                        </div>
+
+                                        <div>
+                                          <Label htmlFor="section-title">Section Title</Label>
+                                          <Input
+                                            id="section-title"
+                                            placeholder={`Section ${(test.sections?.length || 0) + 1} - Conversation`}
+                                            value={sectionData.sectionTitle}
+                                            onChange={(e) => setSectionData(prev => ({ ...prev, sectionTitle: e.target.value }))}
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <Label htmlFor="section-instructions">Instructions</Label>
+                                          <Textarea
+                                            id="section-instructions"
+                                            placeholder="Listen carefully and answer the questions..."
+                                            value={sectionData.instructions}
+                                            onChange={(e) => setSectionData(prev => ({ ...prev, instructions: e.target.value }))}
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <Label htmlFor="section-audio">Audio File</Label>
+                                          <Input
+                                            id="section-audio"
+                                            type="file"
+                                            accept="audio/*"
+                                            onChange={handleFileSelect}
+                                            className="mt-1"
+                                          />
+                                        </div>
+
+                                        <Button
+                                          onClick={() => {
+                                            if (selectedFile && currentTest) {
+                                              uploadSectionAudioMutation.mutate({
+                                                testId: currentTest._id,
+                                                sectionNumber: (currentTest.sections?.length || 0) + 1,
+                                                file: selectedFile,
+                                                sectionTitle: sectionData.sectionTitle || `Section ${(currentTest.sections?.length || 0) + 1}`,
+                                                instructions: sectionData.instructions || "Listen and answer the questions."
+                                              });
+                                            }
+                                          }}
+                                          disabled={!selectedFile || !currentTest || uploadSectionAudioMutation.isPending}
+                                          className="w-full"
+                                        >
+                                          {uploadSectionAudioMutation.isPending ? "Uploading..." : "Upload Section"}
+                                        </Button>
+                                      </div>
+                                    </DialogContent>
+                                  </Dialog>
+                                )}
+                                
+                                <Button variant="ghost" size="sm">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="audio">
