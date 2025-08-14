@@ -224,6 +224,70 @@ export default function AdminDashboard() {
     setTranscript("");
   };
 
+  const handleCreateCompleteTest = async () => {
+    try {
+      setIsUploading(true);
+      
+      // First create the test
+      const testResponse = await apiRequest("POST", "/api/admin/listening-tests", newTestData);
+      const testData = await testResponse.json();
+      
+      // Upload all 4 sections
+      const sectionPromises = [];
+      for (let i = 1; i <= 4; i++) {
+        const titleInput = document.getElementById(`section-${i}-title`) as HTMLInputElement;
+        const audioInput = document.getElementById(`section-${i}-audio`) as HTMLInputElement;
+        const instructionsInput = document.getElementById(`section-${i}-instructions`) as HTMLTextAreaElement;
+        
+        if (audioInput.files && audioInput.files[0]) {
+          const formData = new FormData();
+          formData.append("audio", audioInput.files[0]);
+          formData.append("sectionTitle", titleInput.value || `Section ${i}`);
+          formData.append("instructions", instructionsInput.value || `Listen and answer the questions for Section ${i}`);
+          formData.append("uploadedBy", "admin");
+
+          const uploadPromise = fetch(`/api/admin/listening-tests/${testData.test._id}/sections/${i}/audio`, {
+            method: "POST",
+            body: formData,
+          });
+          
+          sectionPromises.push(uploadPromise);
+        }
+      }
+      
+      // Wait for all sections to upload
+      await Promise.all(sectionPromises);
+      
+      toast({
+        title: "Complete Test Created!",
+        description: "All 4 sections uploaded successfully. Test is now active.",
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/listening-tests"] });
+      setNewTestData({ title: "", description: "", difficulty: "intermediate" });
+      
+      // Clear all form inputs
+      for (let i = 1; i <= 4; i++) {
+        const titleInput = document.getElementById(`section-${i}-title`) as HTMLInputElement;
+        const audioInput = document.getElementById(`section-${i}-audio`) as HTMLInputElement;
+        const instructionsInput = document.getElementById(`section-${i}-instructions`) as HTMLTextAreaElement;
+        
+        if (titleInput) titleInput.value = "";
+        if (audioInput) audioInput.value = "";
+        if (instructionsInput) instructionsInput.value = "";
+      }
+      
+    } catch (error: any) {
+      toast({
+        title: "Upload Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
@@ -237,54 +301,114 @@ export default function AdminDashboard() {
             <Dialog>
               <DialogTrigger asChild>
                 <Button>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Audio
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Complete Test
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Upload Listening Audio</DialogTitle>
+                  <DialogTitle>Create Complete Listening Test</DialogTitle>
+                  <p className="text-sm text-slate-600">Upload all 4 sections to create a complete IELTS listening test</p>
                 </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="audio-file">Audio File</Label>
-                    <Input
-                      id="audio-file"
-                      type="file"
-                      accept="audio/*"
-                      onChange={handleFileSelect}
-                      className="mt-1"
-                    />
-                    <p className="text-xs text-slate-500 mt-1">
-                      Supported: MP3, WAV, M4A (max 100MB)
-                    </p>
+                <div className="space-y-6">
+                  {/* Test Info */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="complete-test-title">Test Title</Label>
+                      <Input
+                        id="complete-test-title"
+                        placeholder="e.g., IELTS Practice Test 2"
+                        value={newTestData.title}
+                        onChange={(e) => setNewTestData(prev => ({ ...prev, title: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="complete-test-difficulty">Difficulty</Label>
+                      <Select
+                        value={newTestData.difficulty}
+                        onValueChange={(value) => setNewTestData(prev => ({ ...prev, difficulty: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="beginner">Beginner</SelectItem>
+                          <SelectItem value="intermediate">Intermediate</SelectItem>
+                          <SelectItem value="advanced">Advanced</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
-                  {selectedFile && (
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <FileAudio className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm">{selectedFile.name}</span>
-                        <span className="text-xs text-slate-500">
-                          ({(selectedFile.size / (1024 * 1024)).toFixed(1)} MB)
-                        </span>
-                      </div>
-                      
-                      {isUploading && (
-                        <div className="space-y-2">
-                          <Progress value={uploadProgress} />
-                          <p className="text-xs text-slate-600">Uploading...</p>
+                  <div>
+                    <Label htmlFor="complete-test-description">Description</Label>
+                    <Textarea
+                      id="complete-test-description"
+                      placeholder="Brief description of the test content..."
+                      value={newTestData.description}
+                      onChange={(e) => setNewTestData(prev => ({ ...prev, description: e.target.value }))}
+                    />
+                  </div>
+
+                  {/* Section Uploads */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-slate-900">Upload Audio Sections</h3>
+                    {[1, 2, 3, 4].map((sectionNum) => (
+                      <Card key={sectionNum} className="p-4">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-medium text-slate-800">Section {sectionNum}</h4>
+                            <Badge variant="outline" className="text-xs">
+                              {sectionNum === 1 ? "Everyday conversation" :
+                               sectionNum === 2 ? "Monologue/Talk" :
+                               sectionNum === 3 ? "Academic conversation" :
+                               "Academic lecture"}
+                            </Badge>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <Label htmlFor={`section-${sectionNum}-title`} className="text-xs">Section Title</Label>
+                              <Input
+                                id={`section-${sectionNum}-title`}
+                                placeholder={`Section ${sectionNum} - ${sectionNum === 1 ? 'Booking Conversation' : sectionNum === 2 ? 'Campus Tour' : sectionNum === 3 ? 'Study Group' : 'Academic Lecture'}`}
+                                className="text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor={`section-${sectionNum}-audio`} className="text-xs">Audio File</Label>
+                              <Input
+                                id={`section-${sectionNum}-audio`}
+                                type="file"
+                                accept="audio/*"
+                                className="text-sm"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label htmlFor={`section-${sectionNum}-instructions`} className="text-xs">Instructions</Label>
+                            <Textarea
+                              id={`section-${sectionNum}-instructions`}
+                              placeholder={`Instructions for Section ${sectionNum}...`}
+                              className="text-sm"
+                              rows={2}
+                            />
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  )}
+                      </Card>
+                    ))}
+                  </div>
 
                   <Button
-                    onClick={handleUpload}
-                    disabled={!selectedFile || isUploading}
+                    onClick={() => {
+                      // Handle complete test creation with all sections
+                      handleCreateCompleteTest();
+                    }}
+                    disabled={!newTestData.title || isUploading}
                     className="w-full"
                   >
-                    {isUploading ? "Uploading..." : "Upload Audio"}
+                    {isUploading ? "Creating Test..." : "Create Complete Test with All Sections"}
                   </Button>
                 </div>
               </DialogContent>
