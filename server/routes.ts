@@ -110,7 +110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/listening-tests/:testId/sections/:sectionNumber/audio", audioUpload.single("audio"), async (req, res) => {
     try {
       const { testId, sectionNumber } = req.params;
-      const { generateContent } = req.body; // Check if AI content generation is requested
+      const { generateContent = true } = req.body; // Default to AI content generation
 
       if (!req.file) {
         return res.status(400).json({ error: "No audio file provided" });
@@ -142,7 +142,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let instructions = req.body.instructions || `Listen to the audio and answer the questions for Section ${sectionNum}`;
       let questions = [];
 
-      if (generateContent && req.file) {
+      // Always generate content when uploading audio files
+      if (req.file) {
         // Transcribe audio
         const transcriptionResult = await openaiService.transcribeAudio(req.file.buffer);
         if (!transcriptionResult.success) {
@@ -198,19 +199,24 @@ Return a JSON object with the following structure:
   ]
 }
 `;
+        console.log("Generating AI content for section", sectionNum);
         const aiResponse = await openaiService.generateText(contentGenerationPrompt);
         if (!aiResponse.success) {
+          console.error("AI content generation failed:", aiResponse.error);
           throw new Error(`AI content generation failed: ${aiResponse.error}`);
         }
 
         let generatedContent;
         try {
+          console.log("AI Response:", aiResponse.data?.text?.substring(0, 500));
           generatedContent = JSON.parse(aiResponse.data!.text);
           sectionTitle = generatedContent.sectionTitle;
           instructions = generatedContent.instructions;
           questions = generatedContent.questions;
+          console.log("Generated questions count:", questions?.length || 0);
         } catch (parseError) {
           console.error("Failed to parse AI generated content:", parseError);
+          console.error("Raw AI response:", aiResponse.data?.text);
           throw new Error("Failed to parse AI generated content.");
         }
       }
@@ -230,27 +236,36 @@ Return a JSON object with the following structure:
 
       // Save generated questions
       const savedQuestions = [];
+      console.log("Processing questions for saving:", questions.length);
       for (const qData of questions) {
-        const questionSchema = insertTestQuestionSchema.parse({
-          section: "listening",
-          questionType: qData.questionType,
-          content: {
-            question: qData.question,
-            options: qData.options
-          },
-          correctAnswers: Array.isArray(qData.correctAnswer) ? qData.correctAnswer : [qData.correctAnswer],
-          orderIndex: qData.orderIndex,
-          audioFileId: audioFile._id!,
-          generatedBy: "ai"
-        });
-        const savedQuestion = await storage.createTestQuestion(questionSchema);
-        savedQuestions.push(savedQuestion);
+        try {
+          console.log("Saving question:", qData.question?.substring(0, 100));
+          const questionSchema = insertTestQuestionSchema.parse({
+            section: "listening",
+            questionType: qData.questionType,
+            content: {
+              question: qData.question,
+              options: qData.options
+            },
+            correctAnswers: Array.isArray(qData.correctAnswer) ? qData.correctAnswer : [qData.correctAnswer],
+            orderIndex: qData.orderIndex,
+            audioFileId: audioFile._id!,
+            generatedBy: "ai"
+          });
+          const savedQuestion = await storage.createTestQuestion(questionSchema);
+          savedQuestions.push(savedQuestion);
+          console.log("Successfully saved question ID:", savedQuestion._id);
+        } catch (error) {
+          console.error("Error saving question:", error);
+        }
       }
 
       // Update section with generated questions
-      await storage.updateListeningSection(section._id!.toString(), {
+      console.log("Updating section with", savedQuestions.length, "questions");
+      const updateResult = await storage.updateListeningSection(section._id!.toString(), {
         questions: savedQuestions.map(q => q._id!)
       });
+      console.log("Section updated:", updateResult ? "success" : "failed");
 
       // Update test with section reference
       const existingSections = await storage.getTestSections(testId);
