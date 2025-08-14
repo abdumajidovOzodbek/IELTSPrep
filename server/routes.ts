@@ -825,15 +825,32 @@ Return a JSON array with this format:
       const result = await openaiService.generateListeningContent();
 
       if (!result.success) {
-        console.error("AI generation failed:", result.error);
-        return res.status(500).json({ error: result.error });
+        console.warn("AI generation failed, using fallback:", result.error);
+        
+        // Return a structured response indicating fallback mode
+        return res.json({
+          success: false,
+          fallback: true,
+          message: "AI service temporarily unavailable. Using pre-defined test content.",
+          error: result.error
+        });
       }
 
       console.log("AI listening content generated successfully");
-      res.json(result.data);
+      res.json({
+        success: true,
+        ...result.data
+      });
     } catch (error: any) {
       console.error("Error generating listening content:", error);
-      res.status(500).json({ error: "Failed to generate listening content" });
+      
+      // Fallback response for any unexpected errors
+      res.json({
+        success: false,
+        fallback: true,
+        message: "AI service unavailable. Using pre-defined test content.",
+        error: "Failed to generate listening content"
+      });
     }
   });
 

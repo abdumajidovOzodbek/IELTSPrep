@@ -50,11 +50,19 @@ export class GeminiService {
   private handleError(error: any): AIResponse {
     console.error('Gemini AI Error:', error);
 
-    // Check if it's a quota exceeded error
+    // Check for specific error statuses
     if (error.status === 429) {
       return {
         success: false,
         error: 'API quota exceeded. Please wait a moment and try again.',
+        rawResponse: error
+      };
+    }
+
+    if (error.status === 503) {
+      return {
+        success: false,
+        error: 'AI service temporarily overloaded. Please try again later.',
         rawResponse: error
       };
     }

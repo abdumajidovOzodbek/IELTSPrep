@@ -27,7 +27,15 @@ export default function ListeningTestPage() {
           sessionId,
           difficulty: "intermediate"
         });
-        return await response.json();
+        const data = await response.json();
+        
+        // Handle graceful fallback from server
+        if (data.fallback) {
+          console.warn("AI service unavailable:", data.message);
+          return null; // Will use fallback questions
+        }
+        
+        return data;
       } catch (error) {
         console.warn("AI content generation failed, using fallback");
         return null;
@@ -104,7 +112,7 @@ export default function ListeningTestPage() {
     } else {
       // All listening sections complete, auto-submit and move to reading
       // Submit all remaining answers before progressing
-      const unansweredQuestions = allSections.flatMap(section => 
+      const unansweredQuestions = allSections.flatMap((section: any) => 
         section.questions?.filter((q: any) => !answers[q._id]) || []
       );
       
