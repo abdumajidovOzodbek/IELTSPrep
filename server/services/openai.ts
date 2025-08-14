@@ -1,4 +1,3 @@
-
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Initialize Gemini AI with API key
@@ -50,7 +49,7 @@ export class GeminiService {
 
   private handleError(error: any): AIResponse {
     console.error('Gemini AI Error:', error);
-    
+
     // Check if it's a quota exceeded error
     if (error.status === 429) {
       return {
@@ -59,7 +58,7 @@ export class GeminiService {
         rawResponse: error
       };
     }
-    
+
     return {
       success: false,
       error: error.message || 'AI service unavailable',
@@ -129,7 +128,7 @@ Output JSON only with fields:
 
       const response = await result.response;
       const jsonResult = JSON.parse(response.text() || '{}');
-      
+
       return {
         success: true,
         data: jsonResult,
@@ -176,7 +175,7 @@ Output JSON only with fields:
 
       const response = await result.response;
       const jsonResult = JSON.parse(response.text() || '{}');
-      
+
       return {
         success: true,
         data: jsonResult,
@@ -199,16 +198,16 @@ Output JSON only with fields:
     try {
       // Convert audio buffer to base64 for Gemini processing
       const base64Audio = audioBuffer.toString('base64');
-      
+
       // Use Gemini to analyze the audio and provide transcription
       const prompt = `Please transcribe this audio file. Provide an accurate, word-for-word transcription of all speech in the audio. Include speaker identification if multiple speakers are present. Format as natural dialogue or monologue as appropriate.`;
 
       const result = await this.model.generateContent({
         contents: [{
-          role: "user", 
+          role: "user",
           parts: [
             { text: prompt },
-            { 
+            {
               inlineData: {
                 mimeType: "audio/mpeg", // Adjust based on actual audio format
                 data: base64Audio
@@ -263,7 +262,7 @@ Return JSON array only.`;
 
       const response = await result.response;
       const jsonResult = JSON.parse(response.text() || '[]');
-      
+
       return {
         success: true,
         data: jsonResult,
@@ -295,7 +294,7 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
 
       const response = await result.response;
       const jsonResult = JSON.parse(response.text() || '{}');
-      
+
       return {
         success: true,
         data: jsonResult,
@@ -324,7 +323,7 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
       const prompt = `Generate a complete IELTS Listening test with exactly 4 sections, 40 questions total (10 questions per section). Each section should have:
 
       Section 1: Everyday conversation (social survival) - 2 speakers
-      Section 2: Monologue in everyday context (social survival) - 1 speaker  
+      Section 2: Monologue in everyday context (social survival) - 1 speaker
       Section 3: Academic conversation - up to 4 speakers
       Section 4: Academic lecture or monologue - 1 speaker
 
@@ -338,7 +337,7 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
         "sections": [
           {
             "sectionNumber": 1,
-            "title": "Section 1 - Everyday Conversation", 
+            "title": "Section 1 - Everyday Conversation",
             "instructions": "You will hear a conversation between...",
             "transcript": "Speaker 1: Good morning, I'd like to make a reservation...",
             "questions": [
@@ -353,7 +352,7 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
                 "orderIndex": 1
               },
               {
-                "_id": "q2", 
+                "_id": "q2",
                 "questionType": "fill_blank",
                 "content": {
                   "question": "The booking is for _______ people."
@@ -379,10 +378,10 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
 
       const response = await result.response;
       let responseText = response.text() || '{}';
-      
+
       // Clean any markdown code block wrappers
       responseText = responseText.replace(/```json\s*|\s*```/g, '').trim();
-      
+
       console.log("AI Generated Listening Content:", responseText.substring(0, 500) + "...");
       const content = JSON.parse(responseText);
 

@@ -213,26 +213,56 @@ export default function ListeningTest() {
               </div>
             </div>
 
-            {audioUrl ? (
-              <AudioPlayer
-                audioUrl={audioUrl}
-                isPlaying={false}
-                onPlayStateChange={() => {}}
-                allowSeeking={false}
-              />
-            ) : (
-              <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">Audio Player</h3>
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                  <p className="text-amber-800 text-sm">
-                    AI is generating your personalized listening test with high-quality audio.
-                    This may take a moment...
-                  </p>
+            {/* Enhanced Audio Player */}
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-900">🎧 Audio Player</h3>
+                <div className="flex items-center space-x-2 text-sm text-slate-600">
+                  <span>Section {currentSection + 1} Audio</span>
                 </div>
               </div>
-            )}
+              
+              {audioUrl ? (
+                <div className="space-y-4">
+                  <AudioPlayer
+                    audioUrl={audioUrl}
+                    isPlaying={isAudioPlaying}
+                    onPlayStateChange={setIsAudioPlaying}
+                    allowSeeking={true}
+                  />
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center space-x-4">
+                      <span className="text-slate-600">💡 You can replay the audio multiple times</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsAudioPlaying(!isAudioPlaying)}
+                        className="flex items-center space-x-1"
+                      >
+                        {isAudioPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                        <span>{isAudioPlaying ? 'Pause' : 'Play'}</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-600"></div>
+                      <div>
+                        <p className="text-amber-800 font-medium">Generating Audio Content</p>
+                        <p className="text-amber-700 text-sm">AI is creating your personalized listening test. Please wait...</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
-            {/* Questions Panel - Show all questions in current section */}
+            {/* Questions Panel - Enhanced UI */}
             {activeQuestions.length > 0 && (
               <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
                 {/* Questions List - Main Panel */}
@@ -242,74 +272,149 @@ export default function ListeningTest() {
                       <h3 className="text-xl font-semibold text-slate-900">
                         Questions {currentSection * 10 + 1}-{currentSection * 10 + activeQuestions.length}
                       </h3>
-                      <p className="text-slate-600 mt-1">
-                        Answer all questions based on what you hear in the audio. You can answer in any order.
-                      </p>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
+                        <p className="text-blue-800 text-sm font-medium">
+                          📝 Instructions: Answer all questions based on what you hear. You can answer in any order.
+                        </p>
+                        <p className="text-blue-700 text-xs mt-1">
+                          💡 Tip: Write exactly what you hear - no more than THREE WORDS AND/OR A NUMBER for fill-in questions.
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Display all questions in current section */}
-                    <div className="space-y-4">
-                      {activeQuestions.map((question: any, index: number) => (
-                        <div 
-                          key={question._id || index}
-                          className="p-4 border rounded-lg hover:border-slate-300 transition-colors"
-                        >
-                          <div className="flex items-start space-x-4">
-                            <div className="flex-shrink-0 w-8 h-8 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-sm font-medium">
-                              {currentSection * 10 + index + 1}
-                            </div>
-                            <div className="flex-1 space-y-3">
-                              <div className="text-slate-800 font-medium leading-relaxed">
-                                {question?.content?.question || question?.question}
+                    {/* Display questions with improved spacing and clarity */}
+                    <div className="space-y-6">
+                      {activeQuestions.map((question: any, index: number) => {
+                        const questionNumber = currentSection * 10 + index + 1;
+                        const isAnswered = !!answers[question._id];
+                        
+                        return (
+                          <div 
+                            key={question._id || index}
+                            className={`p-5 border-2 rounded-xl transition-all duration-200 ${
+                              isAnswered 
+                                ? 'border-green-200 bg-green-50' 
+                                : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                            }`}
+                          >
+                            <div className="flex items-start space-x-4">
+                              <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
+                                isAnswered 
+                                  ? 'bg-green-500 text-white' 
+                                  : 'bg-slate-100 text-slate-700'
+                              }`}>
+                                {questionNumber}
                               </div>
+                              <div className="flex-1 space-y-4">
+                                <div className="text-slate-800 font-medium leading-relaxed text-lg">
+                                  {question?.content?.question || question?.question}
+                                </div>
 
-                              {/* Multiple Choice Options */}
-                              {question?.content?.options && Array.isArray(question.content.options) && (
-                                <div className="space-y-2">
-                                  {question.content.options.map((option: string, optIndex: number) => (
-                                    <label key={optIndex} className="flex items-start space-x-3 cursor-pointer p-3 rounded-md hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200">
+                                {/* Question Type Indicator */}
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-xs px-2 py-1 bg-slate-100 text-slate-600 rounded">
+                                    {question.questionType === 'multiple_choice' ? '🔘 Multiple Choice' : 
+                                     question.questionType === 'fill_blank' ? '✏️ Fill in the Blank' :
+                                     question.questionType === 'short_answer' ? '💬 Short Answer' :
+                                     question.questionType === 'sentence_completion' ? '📝 Complete Sentence' :
+                                     '❓ Question'}
+                                  </span>
+                                  {question.wordLimit && (
+                                    <span className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded">
+                                      Limit: {question.wordLimit}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Multiple Choice Options - Enhanced */}
+                                {question?.content?.options && Array.isArray(question.content.options) && (
+                                  <div className="space-y-3">
+                                    {question.content.options.map((option: string, optIndex: number) => {
+                                      const isSelected = answers[question._id] === option;
+                                      return (
+                                        <label 
+                                          key={optIndex} 
+                                          className={`flex items-start space-x-3 cursor-pointer p-4 rounded-lg transition-all duration-200 border-2 ${
+                                            isSelected 
+                                              ? 'border-primary bg-primary/5 shadow-sm' 
+                                              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                          }`}
+                                        >
+                                          <input
+                                            type="radio"
+                                            name={`question-${question._id}`}
+                                            value={option}
+                                            checked={isSelected}
+                                            onChange={(e) => handleAnswerChange(question._id, e.target.value)}
+                                            className="w-5 h-5 text-primary border-slate-300 focus:ring-primary mt-0.5"
+                                          />
+                                          <span className={`leading-relaxed ${isSelected ? 'font-medium text-primary' : 'text-slate-700'}`}>
+                                            {option}
+                                          </span>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+
+                                {/* Fill in the blank - Enhanced */}
+                                {(!question?.content?.options || question?.content?.options?.length === 0) && (
+                                  <div className="space-y-3">
+                                    <div className="max-w-lg">
                                       <input
-                                        type="radio"
-                                        name={`question-${question._id}`}
-                                        value={option}
-                                        checked={answers[question._id] === option}
+                                        type="text"
+                                        placeholder="Type your answer here..."
+                                        value={answers[question._id] || ''}
                                         onChange={(e) => handleAnswerChange(question._id, e.target.value)}
-                                        className="w-4 h-4 text-primary border-slate-300 focus:ring-primary mt-0.5"
+                                        className="w-full p-4 text-lg border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                                        maxLength={50}
                                       />
-                                      <span className="text-slate-700 leading-relaxed">{option}</span>
-                                    </label>
-                                  ))}
-                                </div>
-                              )}
+                                      <div className="flex items-center justify-between mt-2">
+                                        <p className="text-sm text-slate-500">
+                                          💡 Write exactly what you hear
+                                        </p>
+                                        <p className="text-xs text-orange-600 font-medium">
+                                          Max: THREE WORDS AND/OR A NUMBER
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
 
-                              {/* Fill in the blank */}
-                              {(!question?.content?.options || question?.content?.options?.length === 0) && (
-                                <div className="max-w-md">
-                                  <input
-                                    type="text"
-                                    placeholder="Type your answer here..."
-                                    value={answers[question._id] || ''}
-                                    onChange={(e) => handleAnswerChange(question._id, e.target.value)}
-                                    className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-                                    maxLength={50}
-                                  />
-                                  <p className="text-xs text-slate-500 mt-2">
-                                    Write no more than THREE WORDS and/or A NUMBER
-                                  </p>
-                                </div>
-                              )}
-
-                              {/* Answer Status */}
-                              {answers[question._id] && (
-                                <div className="flex items-center space-x-2 text-sm">
-                                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                  <span className="text-green-600 font-medium">Answered</span>
-                                </div>
-                              )}
+                                {/* Answer Status - Enhanced */}
+                                {isAnswered && (
+                                  <div className="flex items-center space-x-2 text-sm p-2 bg-green-100 rounded-lg">
+                                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                                    <span className="text-green-700 font-medium">✓ Answered</span>
+                                    <span className="text-green-600 ml-2">"{answers[question._id]}"</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
+                    </div>
+
+                    {/* Section Summary */}
+                    <div className="mt-8 p-4 bg-slate-50 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-700 font-medium">
+                          Section {currentSection + 1} Progress:
+                        </span>
+                        <span className="text-slate-900 font-bold">
+                          {activeQuestions.filter((q: any) => answers[q._id]).length} of {activeQuestions.length} answered
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-3 mt-2">
+                        <div 
+                          className="bg-primary h-3 rounded-full transition-all duration-300"
+                          style={{ 
+                            width: `${activeQuestions.length > 0 ? 
+                              (activeQuestions.filter((q: any) => answers[q._id]).length / activeQuestions.length) * 100 : 0}%` 
+                          }}
+                        ></div>
+                      </div>
                     </div>
                   </div>
                 </div>
