@@ -42,26 +42,15 @@ export default function ListeningTest() {
     queryFn: async () => {
       try {
         const response = await apiRequest("GET", "/api/questions/listening");
-        return await response.json();
+        const data = await response.json();
+        console.log("Questions API response:", data);
+        return data;
       } catch (error) {
-        console.warn("Failed to load questions, using fallback");
-        return [
-          {
-            id: "1",
-            question: "What is the main topic of the conversation?",
-            options: ["University enrollment", "Course selection", "Library services", "Campus tour"],
-            type: "multiple_choice"
-          },
-          {
-            id: "2", 
-            question: "When does the semester begin?",
-            options: ["September 1st", "September 15th", "October 1st", "October 15th"],
-            type: "multiple_choice"
-          }
-        ];
+        console.warn("Failed to load questions:", error);
+        return { sections: [] }; // Return empty sections structure
       }
     },
-    enabled: !listeningContent, // Only load fallback questions if AI content fails
+    enabled: !!sessionId, // Load when we have a session
   });
 
   const submitAnswerMutation = useMutation({
@@ -86,9 +75,13 @@ export default function ListeningTest() {
     });
   };
 
-  // Use AI-generated content if available, otherwise fall back to static questions
-  const activeQuestions = listeningContent?.sections?.[0]?.questions || questions;
-  const audioUrl = listeningContent?.sections?.[0]?.audioUrl;
+  // Use actual questions from API response
+  console.log("listeningContent:", listeningContent);
+  console.log("questions from /api/questions/listening:", questions);
+  
+  // The questions API returns the actual test data with sections
+  const activeQuestions = questions?.sections?.[0]?.questions || [];
+  const audioUrl = questions?.sections?.[0]?.audioUrl;
   
   const handleNext = () => {
     if (currentQuestion < activeQuestions.length - 1) {
@@ -202,24 +195,36 @@ export default function ListeningTest() {
                 
                 <div className="space-y-4">
                   <div className="text-slate-800">
-                    {activeQuestions[currentQuestion]?.question}
+                    {activeQuestions[currentQuestion]?.content?.question || activeQuestions[currentQuestion]?.question}
                   </div>
                   
-                  {activeQuestions[currentQuestion]?.options && (
+                  {activeQuestions[currentQuestion]?.content?.options && (
                     <div className="space-y-2">
-                      {activeQuestions[currentQuestion].options.map((option: string, index: number) => (
+                      {activeQuestions[currentQuestion].content.options.map((option: string, index: number) => (
                         <label key={index} className="flex items-center space-x-3 cursor-pointer">
                           <input
                             type="radio"
                             name={`question-${currentQuestion}`}
                             value={option}
-                            checked={answers[activeQuestions[currentQuestion]?.id] === option}
-                            onChange={(e) => handleAnswerChange(activeQuestions[currentQuestion]?.id, e.target.value)}
+                            checked={answers[activeQuestions[currentQuestion]?._id] === option}
+                            onChange={(e) => handleAnswerChange(activeQuestions[currentQuestion]?._id, e.target.value)}
                             className="w-4 h-4 text-primary border-slate-300 focus:ring-primary"
                           />
                           <span className="text-slate-700">{option}</span>
                         </label>
                       ))}
+                    </div>
+                  )}
+                  
+                  {!activeQuestions[currentQuestion]?.content?.options && activeQuestions[currentQuestion]?.questionType === 'fill_blank' && (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Enter your answer..."
+                        value={answers[activeQuestions[currentQuestion]?._id] || ''}
+                        onChange={(e) => handleAnswerChange(activeQuestions[currentQuestion]?._id, e.target.value)}
+                        className="w-full p-3 border border-slate-300 rounded-lg focus:ring-primary focus:border-primary"
+                      />
                     </div>
                   )}
                   
