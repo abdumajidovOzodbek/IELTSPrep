@@ -256,7 +256,9 @@ Return a JSON object with the following structure:
               question: qData.question,
               options: qData.options
             },
-            correctAnswers: Array.isArray(qData.correctAnswer) ? qData.correctAnswer : [qData.correctAnswer],
+            correctAnswers: Array.isArray(qData.correctAnswer) ? 
+            qData.correctAnswer.map(ans => typeof ans === 'object' ? JSON.stringify(ans) : String(ans)) : 
+            [typeof qData.correctAnswer === 'object' ? JSON.stringify(qData.correctAnswer) : String(qData.correctAnswer)],
             orderIndex: qData.orderIndex,
             audioFileId: audioFile._id!,
             generatedBy: "ai"
@@ -276,14 +278,18 @@ Return a JSON object with the following structure:
       });
       console.log("Section updated:", updateResult ? "success" : "failed");
 
-      // Update test with section reference
+      // Update test with section reference and mark as active if all 4 sections are complete
       const existingSections = await storage.getTestSections(testId);
-      const updatedSections = [...existingSections, section];
-
+      console.log("Existing sections count:", existingSections.length, "Current section:", sectionNum);
+      
+      const isTestComplete = existingSections.length === 4;
+      
       await storage.updateListeningTest(testId, {
-        sections: updatedSections.map(s => s._id!),
-        status: updatedSections.length === 4 ? "active" : "draft"
+        sections: existingSections.map(s => s._id!),
+        status: isTestComplete ? "active" : "draft"
       });
+      
+      console.log("Test marked as:", isTestComplete ? "active" : "draft");
 
       res.json({
         message: "Audio uploaded and content generated successfully for section",
