@@ -56,11 +56,14 @@ export default function ReadingTest() {
 
   const submitAnswerMutation = useMutation({
     mutationFn: async (answerData: any) => {
-      const response = await apiRequest("POST", "/api/answers", answerData);
+      const response = await apiRequest("POST", "/api/test/submit-answer", answerData);
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/sessions/${sessionId}/answers`] });
+    },
+    onError: (error: any) => {
+      console.error("Failed to submit answer:", error);
     }
   });
 

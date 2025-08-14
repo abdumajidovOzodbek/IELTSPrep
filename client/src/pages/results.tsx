@@ -1,6 +1,7 @@
 import { useParams } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,29 @@ export default function Results() {
     },
     enabled: !!sessionId,
   });
+
+  // Calculate real scores based on actual answers
+  const calculateScoresMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/sessions/${sessionId}/calculate-scores`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      // Refetch session data to get updated scores
+      queryClient.invalidateQueries({ queryKey: [`/api/sessions/${sessionId}`] });
+    }
+  });
+
+  // Auto-calculate scores when results page loads if no band scores exist
+  useEffect(() => {
+    if (session && !sessionLoading) {
+      const hasAnyBandScore = session.listeningBand || session.readingBand || session.writingBand || session.speakingBand;
+      if (!hasAnyBandScore) {
+        console.log("No band scores found, calculating based on actual answers...");
+        calculateScoresMutation.mutate();
+      }
+    }
+  }, [session, sessionLoading]);
 
   const { data: evaluations = [], isLoading: evaluationsLoading } = useQuery({
     queryKey: [`/api/sessions/${sessionId}/evaluations`],

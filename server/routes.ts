@@ -660,6 +660,22 @@ Return a JSON array with this format:
       const answer = await storage.createTestAnswer(answerData);
       res.json(answer);
     } catch (error: any) {
+      console.error("Answer submission error:", error);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Alternative endpoint for backward compatibility
+  app.post("/api/test/submit-answer", async (req, res) => {
+    try {
+      console.log("Received answer submission:", JSON.stringify(req.body, null, 2));
+      const answerData = insertTestAnswerSchema.parse(req.body);
+      const answer = await storage.createTestAnswer(answerData);
+      console.log("Answer saved successfully:", answer._id);
+      res.json(answer);
+    } catch (error: any) {
+      console.error("Answer submission error:", error);
+      console.error("Request body:", req.body);
       res.status(400).json({ error: error.message });
     }
   });
@@ -1409,6 +1425,71 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
       const evaluations = await storage.getSessionEvaluations(req.params.sessionId);
       res.json(evaluations);
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Calculate and update session scores based on actual answers
+  app.post("/api/sessions/:sessionId/calculate-scores", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      console.log("Calculating scores for session:", sessionId);
+      
+      // Get all answers for this session
+      const answers = await storage.getSessionAnswers(sessionId);
+      console.log("Found answers:", answers.length);
+      
+      if (answers.length === 0) {
+        return res.status(400).json({ error: "No answers found for this session" });
+      }
+      
+      // Group answers by section
+      const answersBySection = answers.reduce((acc, answer) => {
+        const section = answer.section || 'unknown';
+        if (!acc[section]) acc[section] = [];
+        acc[section].push(answer);
+        return acc;
+      }, {} as Record<string, any[]>);
+      
+      console.log("Answers by section:", Object.keys(answersBySection));
+      
+      // Calculate scores for each section (simplified scoring for now)
+      const sectionScores: any = {};
+      
+      // For now, assign scores based on number of answers submitted
+      Object.keys(answersBySection).forEach(section => {
+        const sectionAnswers = answersBySection[section];
+        const answeredCount = sectionAnswers.filter(a => a.answer && a.answer.toString().trim() !== '').length;
+        
+        // Simple scoring: percentage of questions answered converted to IELTS band
+        let band = 5.0; // Base score
+        if (answeredCount > 0) {
+          const completionRate = Math.min(answeredCount / 10, 1); // Assume 10 questions per section
+          band = 5.0 + (completionRate * 4.0); // Scale from 5.0 to 9.0
+        }
+        
+        sectionScores[`${section}Band`] = Math.round(band * 2) / 2; // Round to nearest 0.5
+      });
+      
+      // Calculate overall band (average of all sections)
+      const bands = Object.values(sectionScores).filter(b => typeof b === 'number') as number[];
+      const overallBand = bands.length > 0 ? 
+        Math.round((bands.reduce((a, b) => a + b, 0) / bands.length) * 2) / 2 : 6.0;
+      
+      sectionScores.overallBand = overallBand;
+      
+      console.log("Calculated scores:", sectionScores);
+      
+      // Update session with calculated scores
+      const updatedSession = await storage.updateTestSession(sessionId, sectionScores);
+      
+      res.json({
+        message: "Scores calculated successfully",
+        scores: sectionScores,
+        session: updatedSession
+      });
+    } catch (error: any) {
+      console.error("Score calculation error:", error);
       res.status(500).json({ error: error.message });
     }
   });

@@ -95,7 +95,8 @@ export const testAnswerSchema = z.object({
   _id: z.instanceof(ObjectId).optional(),
   sessionId: z.string(),
   questionId: z.string(),
-  answer: z.record(z.any()),
+  answer: z.union([z.string(), z.record(z.any())]), // Accept both string and object answers
+  section: z.enum(["listening", "reading", "writing", "speaking"]).optional(),
   isCorrect: z.boolean().optional(),
   score: z.number().optional(),
   timeSpent: z.number().optional(),
