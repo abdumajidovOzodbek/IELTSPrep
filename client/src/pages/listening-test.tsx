@@ -89,8 +89,16 @@ export default function ListeningTest() {
 
   // Get all 4 sections from AI generated content or API
   const allSections = listeningContent?.sections || questions?.sections || [];
+  console.log("All sections:", allSections);
+  console.log("Current section index:", currentSection);
+  
   const currentSectionData = allSections[currentSection];
+  console.log("Current section data:", currentSectionData);
+  
   const activeQuestions = currentSectionData?.questions || [];
+  console.log("Active questions:", activeQuestions);
+  console.log("Active questions length:", activeQuestions.length);
+  
   const sectionTitle = currentSectionData?.title || `Section ${currentSection + 1}`;
   const sectionInstructions = currentSectionData?.instructions || "Listen carefully and answer all questions.";
   const transcript = currentSectionData?.transcript || "";
@@ -177,7 +185,7 @@ export default function ListeningTest() {
       <TestHeader session={session} />
 
       <div className="flex flex-1">
-        <TestNavigation currentSection="listening" sessionId={sessionId} />
+        <TestNavigation currentSection="listening" sessionId={sessionId || ""} />
 
         <main className="flex-1 p-6">
           <div className="max-w-5xl mx-auto space-y-6">
@@ -196,7 +204,7 @@ export default function ListeningTest() {
 
               {/* Section Navigation */}
               <div className="flex gap-2 mb-4">
-                {allSections.map((_, index) => (
+                {allSections.map((_: any, index: number) => (
                   <Button
                     key={index}
                     variant={index === currentSection ? "default" : "outline"}
@@ -272,6 +280,18 @@ export default function ListeningTest() {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Debug Information */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+              <h3 className="font-semibold text-yellow-800 mb-2">Debug Info</h3>
+              <div className="text-sm text-yellow-700 space-y-1">
+                <p>All sections count: {allSections.length}</p>
+                <p>Current section index: {currentSection}</p>
+                <p>Active questions count: {activeQuestions.length}</p>
+                <p>Has questions data: {questions?.sections ? 'Yes' : 'No'}</p>
+                <p>Has AI content: {listeningContent?.sections ? 'Yes' : 'No'}</p>
+              </div>
             </div>
 
             {/* Questions Panel - Enhanced UI */}
@@ -461,7 +481,7 @@ export default function ListeningTest() {
                   <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
                     <h4 className="font-semibold text-slate-900 mb-3">Test Progress</h4>
                     <div className="space-y-3">
-                      {allSections.map((section, index) => {
+                      {allSections.map((section: any, index: number) => {
                         const sectionQuestions = section?.questions || [];
                         const sectionAnswered = sectionQuestions.filter((q: any) => answers[q._id]).length;
                         const isCurrentSection = index === currentSection;
