@@ -62,13 +62,34 @@ export default function ReadingTest() {
       setCurrentPassage(prev => prev + 1);
       setCurrentQuestion(0);
     } else {
-      // All passages complete, move to writing test
-      updateSession({ currentSection: "writing" });
+      // All reading passages complete, auto-submit and move to writing
+      // Submit all remaining answers before progressing
+      const unansweredQuestions = allPassages.flatMap(passage => 
+        passage.questions?.filter((q: any) => !answers[q._id]) || []
+      );
+      
+      // Auto-submit blank answers for unanswered questions
+      unansweredQuestions.forEach((question: any) => {
+        submitAnswerMutation.mutate({
+          sessionId: sessionId,
+          questionId: question._id,
+          answer: "", // Blank answer
+          section: "reading",
+          timeSpent: 0
+        });
+      });
+
+      // Update session to writing (this locks reading section)
+      updateSession({ 
+        currentSection: "writing",
+        readingCompleted: true 
+      });
       window.location.href = `/test/${sessionId}/writing`;
     }
   };
 
   const handlePrevious = () => {
+    // Only allow going back within the current reading section
     if (currentQuestion > 0) {
       setCurrentQuestion(prev => prev - 1);
     } else if (currentPassage > 0) {
@@ -77,6 +98,7 @@ export default function ReadingTest() {
       const prevPassageQuestions = allPassages[currentPassage - 1]?.questions || [];
       setCurrentQuestion(prevPassageQuestions.length - 1);
     }
+    // Cannot go back to listening section
   };
 
   // Show loading state

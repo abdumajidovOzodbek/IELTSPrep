@@ -102,20 +102,43 @@ export default function ListeningTestPage() {
       setCurrentSection(prev => prev + 1);
       setCurrentQuestion(0);
     } else {
-      // All sections complete, move to reading test
-      updateSession({ currentSection: "reading" });
+      // All listening sections complete, auto-submit and move to reading
+      // Submit all remaining answers before progressing
+      const unansweredQuestions = allSections.flatMap(section => 
+        section.questions?.filter((q: any) => !answers[q._id]) || []
+      );
+      
+      // Auto-submit blank answers for unanswered questions
+      unansweredQuestions.forEach((question: any) => {
+        submitAnswerMutation.mutate({
+          sessionId: sessionId,
+          questionId: question._id,
+          answer: "", // Blank answer
+          section: "listening",
+          timeSpent: 0
+        });
+      });
+
+      // Update session to reading (this locks listening section)
+      updateSession({ 
+        currentSection: "reading",
+        listeningCompleted: true 
+      });
       window.location.href = `/test/${sessionId}/reading`;
     }
   };
 
   const handlePrevious = () => {
+    // Only allow going back within the current listening section
     if (currentQuestion > 0) {
       setCurrentQuestion(prev => prev - 1);
     } else if (currentSection > 0) {
-      // Move to previous section
+      // Move to previous section within listening only
       setCurrentSection(prev => prev - 1);
-      setCurrentQuestion(activeQuestions.length - 1);
+      const prevSectionQuestions = allSections[currentSection - 1]?.questions || [];
+      setCurrentQuestion(prevSectionQuestions.length - 1);
     }
+    // Cannot go back to previous test sections (e.g., no going back from reading to listening)
   };
 
   const goToSection = (sectionIndex: number) => {

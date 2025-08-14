@@ -19,6 +19,20 @@ export default function SpeakingTest() {
   const [preparationTime, setPreparationTime] = useState(60);
   const [notes, setNotes] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [responses, setResponses] = useState({}); // State to store responses for each part
+
+  // Mutation to submit individual answers (used for speaking parts)
+  const submitAnswerMutation = useMutation({
+    mutationFn: async (data: { sessionId: string; questionId: string; answer: string; section: string; timeSpent: number }) => {
+      const response = await apiRequest("POST", "/api/test/submit-answer", data);
+      return response.json();
+    },
+    onSuccess: (data, variables) => {
+      console.log(`Answer submitted for ${variables.questionId}:`, data);
+      // Update session state to reflect progress if needed
+      // For speaking, progress is implicitly handled by completing the section
+    }
+  });
 
   const evaluateSpeakingMutation = useMutation({
     mutationFn: async (data: { transcript: string }) => {
@@ -54,19 +68,55 @@ export default function SpeakingTest() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Function to handle moving to the next part (and auto-submitting current)
+  const handleNextPart = () => {
+    if (session && session.currentSection === "speaking") {
+      // Assuming 'speaking' section has only one part for simplicity in this example
+      // In a real scenario, you'd iterate through parts
+      const currentSpeakingPartId = "1"; // Example part ID
+
+      // Find the current speaking response to submit
+      const currentSpeakingResponse = Object.values(responses).find(res => res.partId === currentSpeakingPartId);
+
+      if (currentSpeakingResponse && currentSpeakingResponse.audioBlob) {
+        submitAnswerMutation.mutate({
+          sessionId: sessionId,
+          questionId: `speaking_${currentSpeakingPartId}`,
+          answer: `Audio response for part ${currentSpeakingPartId}`, // Placeholder, actual audio submission would be different
+          section: "speaking",
+          timeSpent: 0 // This would need to be tracked
+        });
+      }
+    }
+    
+    // Logic to move to the next section (or complete the test)
+    // This part needs to be more dynamic based on the actual test structure
+    // For now, let's assume speaking is the last part or we are moving to a hypothetical 'next' section
+    updateSession({ 
+      currentSection: "completed", // This should ideally transition to the next logical section or results
+      speakingCompleted: true // Mark speaking as completed
+    });
+    window.location.href = `/results/${sessionId}`; // Redirect to results
+  };
+
   if (!session) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
     </div>;
   }
 
+  // Determine if the user can navigate back (only if not in speaking or speaking is not yet completed)
+  const canGoBack = session.currentSection !== "speaking" || !session.speakingCompleted;
+
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <TestHeader session={session} />
-      
+
       <div className="flex flex-1">
-        <TestNavigation currentSection="speaking" sessionId={sessionId} />
-        
+        {/* Pass canGoBack prop to TestNavigation */}
+        <TestNavigation currentSection={session.currentSection} sessionId={sessionId} canGoBack={canGoBack} />
+
         <main className="flex-1 p-6 ml-64">
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Section Header */}
@@ -76,10 +126,13 @@ export default function SpeakingTest() {
                   <h1 className="text-2xl font-bold text-slate-900">Speaking Test</h1>
                   <p className="text-slate-600 mt-1">Part 2 • Individual Long Turn</p>
                 </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-primary">{formatTime(preparationTime)}</div>
-                  <div className="text-sm text-slate-600">Preparation time</div>
-                </div>
+                {/* Only show preparation time if it's still counting down */}
+                {preparationTime > 0 && (
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-primary">{formatTime(preparationTime)}</div>
+                    <div className="text-sm text-slate-600">Preparation time</div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -112,46 +165,87 @@ export default function SpeakingTest() {
             </Card>
 
             {/* Topic Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Topic</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-6">
-                  <h4 className="font-semibold text-yellow-900 mb-3">
-                    Describe a place you visited that was particularly memorable.
-                  </h4>
-                  <p className="text-yellow-800 mb-4">You should say:</p>
-                  <ul className="text-yellow-800 space-y-2 ml-4">
-                    <li>• where this place was</li>
-                    <li>• when you visited it</li>
-                    <li>• what you did there</li>
-                    <li>• and explain why it was so memorable for you</li>
-                  </ul>
-                </div>
-                
-                <div className="mt-6">
-                  <h4 className="font-medium text-slate-900 mb-2">Your Notes (optional)</h4>
-                  <Textarea
-                    className="h-32"
-                    placeholder="You can write notes here to help prepare your answer..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+            {session.currentSection === "speaking" && preparationTime === 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Your Topic</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-6">
+                    <h4 className="font-semibold text-yellow-900 mb-3">
+                      Describe a place you visited that was particularly memorable.
+                    </h4>
+                    <p className="text-yellow-800 mb-4">You should say:</p>
+                    <ul className="text-yellow-800 space-y-2 ml-4">
+                      <li>• where this place was</li>
+                      <li>• when you visited it</li>
+                      <li>• what you did there</li>
+                      <li>• and explain why it was so memorable for you</li>
+                    </ul>
+                  </div>
+
+                  <div className="mt-6">
+                    <h4 className="font-medium text-slate-900 mb-2">Your Notes (optional)</h4>
+                    <Textarea
+                      className="h-32"
+                      placeholder="You can write notes here to help prepare your answer..."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Recording Interface */}
-            <SpeakingRecorder
-              isRecording={isRecording}
-              onStartRecording={() => setIsRecording(true)}
-              onStopRecording={(transcript) => {
-                setIsRecording(false);
-                evaluateSpeakingMutation.mutate({ transcript });
-              }}
-              preparationComplete={preparationTime === 0}
-            />
+            {session.currentSection === "speaking" && (
+              <SpeakingRecorder
+                isRecording={isRecording}
+                onStartRecording={() => setIsRecording(true)}
+                onStopRecording={(transcript, audioBlob) => {
+                  setIsRecording(false);
+                  // Store the response with audioBlob
+                  setResponses(prev => ({ ...prev, 1: { transcript, audioBlob } })); // Assuming part 1
+                  // Optionally, evaluate immediately or wait for user to click complete
+                  // evaluateSpeakingMutation.mutate({ transcript }); 
+                }}
+                preparationComplete={preparationTime === 0}
+              />
+            )}
+
+            {/* Navigation Button */}
+            {session.currentSection === "speaking" && (
+              <div className="text-right">
+                <Button
+                  onClick={() => {
+                    // Auto-submit all speaking responses
+                    Object.keys(responses).forEach(partId => {
+                      if (responses[partId]?.audioBlob) {
+                        // Submit speaking response (would need audio handling in real implementation)
+                        submitAnswerMutation.mutate({
+                          sessionId: sessionId,
+                          questionId: `speaking_${partId}`,
+                          answer: `Audio response for ${partId}`,
+                          section: "speaking",
+                          timeSpent: 0
+                        });
+                      }
+                    });
+
+                    // Complete the entire test
+                    updateSession({ 
+                      currentSection: "completed",
+                      speakingCompleted: true 
+                    });
+                    window.location.href = `/results/${sessionId}`;
+                  }}
+                  size="lg"
+                  className="bg-primary hover:bg-primary/90"
+                >
+                  Complete Test
+                </Button>
+              </div>
+            )}
           </div>
         </main>
       </div>

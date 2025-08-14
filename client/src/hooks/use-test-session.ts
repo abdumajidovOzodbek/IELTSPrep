@@ -116,8 +116,8 @@ export function useTestSession(sessionId?: string) {
     const currentIndex = sections.indexOf(session?.currentSection || 'listening');
     const targetIndex = sections.indexOf(sectionId);
     
-    // Can access current section or any completed section
-    return targetIndex <= currentIndex;
+    // Can ONLY access current section (no going back to completed sections)
+    return targetIndex === currentIndex;
   };
 
   return {

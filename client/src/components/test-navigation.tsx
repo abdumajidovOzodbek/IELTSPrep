@@ -72,14 +72,16 @@ export default function TestNavigation({ currentSection, sessionId }: TestNaviga
     const currentIndex = order.indexOf(current);
     const sectionIndex = order.indexOf(sectionId);
     
-    if (sectionIndex < currentIndex) return 'completed';
-    if (sectionIndex > currentIndex) return 'locked';
-    return 'available';
+    if (sectionIndex < currentIndex) return 'completed'; // Previous sections are completed and locked
+    if (sectionIndex > currentIndex) return 'locked';   // Future sections are locked
+    return 'available'; // Only current section is available
   }
 
   const handleSectionClick = (sectionId: string, status: string) => {
-    if (status === 'locked') return;
-    setLocation(`/${sectionId}/${sessionId}`);
+    if (status === 'locked' || status === 'completed') return;
+    // Only allow clicking on current active section
+    if (sectionId !== currentSection) return;
+    setLocation(`/test/${sessionId}/${sectionId}`);
   };
 
   return (
@@ -100,13 +102,13 @@ export default function TestNavigation({ currentSection, sessionId }: TestNaviga
               <button
                 key={section.id}
                 onClick={() => handleSectionClick(section.id, section.status)}
-                disabled={isLocked}
+                disabled={isLocked || isCompleted}
                 className={cn(
                   "flex items-center w-full px-3 py-2 text-sm font-medium rounded-lg transition-colors",
                   isActive && "text-white bg-primary",
-                  !isActive && !isLocked && "text-slate-700 hover:bg-slate-100",
-                  isLocked && "text-slate-400 cursor-not-allowed",
-                  isCompleted && !isActive && "text-green-700 hover:bg-green-50"
+                  !isActive && !isLocked && !isCompleted && "text-slate-700 hover:bg-slate-100",
+                  (isLocked || isCompleted) && "text-slate-400 cursor-not-allowed",
+                  isCompleted && !isActive && "text-green-700 bg-green-50"
                 )}
               >
                 <Icon className="h-5 w-5 mr-3" />
