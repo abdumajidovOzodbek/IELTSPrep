@@ -20,6 +20,27 @@ export default function ReadingTest() {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
 
+  // Route protection: redirect if user tries to access wrong section
+  // Must be at the top to avoid hooks order violation
+  useEffect(() => {
+    if (session) {
+      if (session.currentSection === "listening") {
+        // Still on listening, redirect back
+        window.location.href = `/test/${sessionId}/listening`;
+      } else if (session.currentSection === "writing") {
+        // Already moved to writing, redirect to writing
+        window.location.href = `/test/${sessionId}/writing`;
+      } else if (session.currentSection === "speaking") {
+        // Already moved to speaking, redirect to speaking
+        window.location.href = `/test/${sessionId}/speaking`;
+      } else if (session.currentSection === "completed") {
+        // Test completed, redirect to results
+        window.location.href = `/results/${sessionId}`;
+      }
+      // Only allow access if currentSection is "reading"
+    }
+  }, [session, sessionId]);
+
   // Get structured reading test data
   const { data: testData, isLoading } = useQuery({
     queryKey: ["/api/questions/reading"],
@@ -120,25 +141,7 @@ export default function ReadingTest() {
     </div>;
   }
 
-  // Route protection: redirect if user tries to access wrong section
-  useEffect(() => {
-    if (session) {
-      if (session.currentSection === "listening") {
-        // Still on listening, redirect back
-        window.location.href = `/test/${sessionId}/listening`;
-      } else if (session.currentSection === "writing") {
-        // Already moved to writing, redirect to writing
-        window.location.href = `/test/${sessionId}/writing`;
-      } else if (session.currentSection === "speaking") {
-        // Already moved to speaking, redirect to speaking
-        window.location.href = `/test/${sessionId}/speaking`;
-      } else if (session.currentSection === "completed") {
-        // Test completed, redirect to results
-        window.location.href = `/results/${sessionId}`;
-      }
-      // Only allow access if currentSection is "reading"
-    }
-  }, [session, sessionId]);
+  
 
   // Use structured test data - sort passages by passageNumber
   const allPassages = (testData?.passages || []).sort((a: any, b: any) => a.passageNumber - b.passageNumber);
