@@ -251,68 +251,141 @@ export default function ListeningTestPage() {
                     </div>
 
                     {/* Display all questions in current section */}
-                    <div className="space-y-4">
-                      {activeQuestions.map((question: any, index: number) => (
-                        <div 
-                          key={question._id || index}
-                          className="p-4 border rounded-lg hover:border-slate-300 transition-colors"
-                        >
-                          <div className="flex items-start space-x-4">
-                            <div className="flex-shrink-0 w-8 h-8 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-sm font-medium">
-                              {currentSection * 10 + index + 1}
-                            </div>
-                            <div className="flex-1 space-y-3">
-                              <div className="text-slate-800 font-medium leading-relaxed">
-                                {question?.content?.question || question?.question}
-                              </div>
-
-                              {/* Multiple Choice Options */}
-                              {question?.content?.options && Array.isArray(question.content.options) && (
-                                <div className="space-y-2">
-                                  {question.content.options.map((option: string, optIndex: number) => (
-                                    <label key={optIndex} className="flex items-start space-x-3 cursor-pointer p-3 rounded-md hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200">
-                                      <input
-                                        type="radio"
-                                        name={`question-${question._id}`}
-                                        value={option}
-                                        checked={answers[question._id] === option}
-                                        onChange={(e) => handleAnswerChange(question._id, e.target.value)}
-                                        className="w-4 h-4 text-primary border-slate-300 focus:ring-primary mt-0.5"
-                                      />
-                                      <span className="text-slate-700 leading-relaxed">{option}</span>
-                                    </label>
-                                  ))}
+                    <div className="space-y-6">
+                      {activeQuestions.map((question: any, index: number) => {
+                        const questionNumber = currentSection * 10 + index + 1;
+                        const questionText = question?.content?.question || question?.question || '';
+                        const isAnswered = !!answers[question._id];
+                        
+                        // Check if it's a form completion question (has blanks to fill)
+                        const isFormCompletion = questionText.includes('_______') || questionText.includes('__________');
+                        
+                        // Check if it's multiple choice
+                        const isMultipleChoice = question?.content?.options && Array.isArray(question.content.options) && question.content.options.length > 0;
+                        
+                        return (
+                          <div key={question._id || index} className="space-y-3">
+                            {/* Form Completion Style */}
+                            {isFormCompletion && (
+                              <div className="flex items-start space-x-4">
+                                <div className="flex-shrink-0 w-8 h-8 bg-teal-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                                  {questionNumber}
                                 </div>
-                              )}
+                                <div className="flex-1">
+                                  <div 
+                                    className="text-slate-800 leading-relaxed"
+                                    dangerouslySetInnerHTML={{
+                                      __html: questionText.replace(
+                                        /_______+/g,
+                                        `<input 
+                                          type="text" 
+                                          value="${answers[question._id] || ''}"
+                                          style="
+                                            border: none; 
+                                            border-bottom: 2px solid #0891b2; 
+                                            background: transparent; 
+                                            padding: 2px 8px; 
+                                            min-width: 120px; 
+                                            font-size: inherit;
+                                            outline: none;
+                                            margin: 0 4px;
+                                          "
+                                          placeholder="..."
+                                          onchange="this.dispatchEvent(new CustomEvent('answer-change', {detail: {questionId: '${question._id}', value: this.value}}))"
+                                        />`
+                                      )
+                                    }}
+                                    onInput={(e: any) => {
+                                      if (e.target.tagName === 'INPUT') {
+                                        handleAnswerChange(question._id, e.target.value);
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
 
-                              {/* Fill in the blank */}
-                              {(!question?.content?.options || question?.content?.options?.length === 0) && (
-                                <div className="max-w-md">
+                            {/* Multiple Choice Style */}
+                            {isMultipleChoice && !isFormCompletion && (
+                              <div>
+                                <div className="flex items-start space-x-4 mb-4">
+                                  <div className="flex-shrink-0 w-8 h-8 bg-teal-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                                    {questionNumber}
+                                  </div>
+                                  <div className="flex-1 text-slate-800 leading-relaxed">
+                                    {questionText}
+                                  </div>
+                                </div>
+                                
+                                <div className="ml-12 space-y-3">
+                                  {question.content.options.map((option: string, optIndex: number) => {
+                                    const letter = String.fromCharCode(65 + optIndex); // A, B, C, D
+                                    const isSelected = answers[question._id] === letter;
+                                    
+                                    return (
+                                      <label key={optIndex} className="flex items-start space-x-4 cursor-pointer group">
+                                        <div className="flex items-center space-x-3">
+                                          <div className="w-8 h-8 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center text-sm font-bold">
+                                            {letter}
+                                          </div>
+                                          <div className={`w-5 h-5 border-2 ${isSelected ? 'border-teal-500 bg-teal-50' : 'border-slate-300'} rounded transition-colors`}>
+                                            {isSelected && (
+                                              <div className="w-full h-full bg-teal-500 rounded-sm"></div>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <input
+                                          type="radio"
+                                          name={`question-${question._id}`}
+                                          value={letter}
+                                          checked={isSelected}
+                                          onChange={(e) => handleAnswerChange(question._id, e.target.value)}
+                                          className="sr-only"
+                                        />
+                                        <span className="text-slate-700 leading-relaxed group-hover:text-slate-900 transition-colors">
+                                          {option}
+                                        </span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Fill in the blank style (sentence completion) */}
+                            {!isFormCompletion && !isMultipleChoice && (
+                              <div>
+                                <div className="flex items-start space-x-4 mb-3">
+                                  <div className="flex-shrink-0 w-8 h-8 bg-teal-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                                    {questionNumber}
+                                  </div>
+                                  <div className="flex-1 text-slate-800 leading-relaxed">
+                                    {questionText}
+                                  </div>
+                                </div>
+                                
+                                <div className="ml-12">
                                   <input
                                     type="text"
-                                    placeholder="Type your answer here..."
+                                    placeholder="..."
                                     value={answers[question._id] || ''}
                                     onChange={(e) => handleAnswerChange(question._id, e.target.value)}
-                                    className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                                    className="border-none border-b-2 border-teal-500 bg-transparent px-2 py-1 min-w-[200px] focus:outline-none focus:border-teal-600 text-slate-800"
                                     maxLength={50}
                                   />
-                                  <p className="text-xs text-slate-500 mt-2">
-                                    Write no more than THREE WORDS and/or A NUMBER
-                                  </p>
                                 </div>
-                              )}
+                              </div>
+                            )}
 
-                              {/* Answer Status */}
-                              {answers[question._id] && (
-                                <div className="flex items-center space-x-2 text-sm">
-                                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                  <span className="text-green-600 font-medium">Answered</span>
-                                </div>
-                              )}
-                            </div>
+                            {/* Word limit reminder */}
+                            {!isMultipleChoice && (
+                              <div className="ml-12 text-xs text-red-600 font-medium">
+                                Write NO MORE THAN THREE WORDS AND/OR A NUMBER for each answer.
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

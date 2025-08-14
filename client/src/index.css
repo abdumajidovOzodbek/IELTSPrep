@@ -107,3 +107,68 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+/* Custom styles for IELTS listening test questions */
+.ielts-form-input {
+  border: none !important;
+  border-bottom: 2px solid #0891b2 !important;
+  background: transparent !important;
+  padding: 2px 8px !important;
+  min-width: 120px !important;
+  font-size: inherit !important;
+  outline: none !important;
+  margin: 0 4px !important;
+}
+
+.ielts-form-input:focus {
+  border-bottom-color: #0e7490 !important;
+}
+
+.ielts-question-number {
+  width: 32px;
+  height: 32px;
+  background-color: #14b8a6;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.ielts-option-letter {
+  width: 32px;
+  height: 32px;
+  background-color: #f1f5f9;
+  color: #475569;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.ielts-checkbox {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #cbd5e1;
+  border-radius: 3px;
+  transition: all 0.2s;
+}
+
+.ielts-checkbox.selected {
+  border-color: #14b8a6;
+  background-color: #f0fdfa;
+}
+
+.ielts-checkbox.selected::after {
+  content: '';
+  width: 100%;
+  height: 100%;
+  background-color: #14b8a6;
+  border-radius: 1px;
+  display: block;
+}
