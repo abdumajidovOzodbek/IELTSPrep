@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import TestHeader from "@/components/test-header";
 import TestNavigation from "@/components/test-navigation";
 import AudioPlayer from "@/components/audio-player";
@@ -32,7 +32,7 @@ export default function ListeningTest() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/sessions/${sessionId}/answers`] });
+      // Query will automatically refetch on success
     }
   });
 
