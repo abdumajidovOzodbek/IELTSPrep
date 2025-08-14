@@ -10,7 +10,9 @@ import { useTestSession } from "@/hooks/use-test-session";
 
 export default function ListeningTest() {
   const { sessionId } = useParams();
-  const { session, updateSession } = useTestSession(sessionId);
+  console.log("ListeningTest: sessionId =", sessionId);
+  const { session, updateSession, isLoading: sessionLoading, error: sessionError } = useTestSession(sessionId);
+  console.log("ListeningTest: session =", session, "loading =", sessionLoading, "error =", sessionError);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
 
@@ -103,11 +105,29 @@ export default function ListeningTest() {
     }
   };
 
-  if (!session) {
+  if (sessionLoading) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
         <p className="text-slate-600">Loading test session...</p>
+      </div>
+    </div>;
+  }
+
+  if (sessionError) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="text-center text-red-600">
+        <p>Error loading session: {sessionError.message}</p>
+        <p>Session ID: {sessionId}</p>
+      </div>
+    </div>;
+  }
+
+  if (!session) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="text-center text-orange-600">
+        <p>Session not found</p>
+        <p>Session ID: {sessionId}</p>
       </div>
     </div>;
   }
