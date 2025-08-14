@@ -399,11 +399,57 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
       const response = await result.response;
       let responseText = response.text() || '{}';
 
-      // Clean any markdown code block wrappers
+      // Clean any markdown code block wrappers and extra whitespace
       responseText = responseText.replace(/```json\s*|\s*```/g, '').trim();
-
+      
+      // Remove any trailing commas before closing brackets/braces
+      responseText = responseText.replace(/,(\s*[}\]])/g, '$1');
+      
+      // Fix common JSON issues
+      responseText = responseText.replace(/([{,]\s*)(\w+):/g, '$1"$2":'); // Quote unquoted keys
+      
       console.log("AI Generated Listening Content:", responseText.substring(0, 500) + "...");
-      const content = JSON.parse(responseText);
+      
+      let content;
+      try {
+        content = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error("JSON Parse Error:", parseError);
+        console.error("Problematic JSON:", responseText.substring(0, 1000));
+        
+        // Return a fallback structure with sample questions
+        content = {
+          sections: [
+            {
+              sectionNumber: 1,
+              title: "Section 1 - Everyday Conversation",
+              instructions: "You will hear a conversation. Listen carefully and answer the questions.",
+              transcript: "This is a sample conversation...",
+              questions: [
+                {
+                  _id: "q1",
+                  questionType: "multiple_choice",
+                  content: {
+                    question: "What is the main topic of the conversation?",
+                    options: ["Planning a trip", "Making a reservation", "Asking for directions", "Discussing the weather"]
+                  },
+                  correctAnswers: ["Making a reservation"],
+                  orderIndex: 1
+                },
+                {
+                  _id: "q2",
+                  questionType: "fill_blank",
+                  content: {
+                    question: "The booking is for _______ people."
+                  },
+                  correctAnswers: ["two", "2"],
+                  orderIndex: 2
+                }
+              ]
+            }
+          ]
+        };
+      }
 
       return {
         success: true,

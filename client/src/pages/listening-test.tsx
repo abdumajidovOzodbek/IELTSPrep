@@ -95,7 +95,14 @@ export default function ListeningTest() {
   const currentSectionData = allSections[currentSection];
   console.log("Current section data:", currentSectionData);
   
-  const activeQuestions = currentSectionData?.questions || [];
+  // Prioritize AI-generated questions if available, otherwise use database questions
+  let activeQuestions = currentSectionData?.questions || [];
+  
+  // If we have AI-generated content, use those questions
+  if (listeningContent?.sections && listeningContent.sections[currentSection]?.questions) {
+    activeQuestions = listeningContent.sections[currentSection].questions;
+  }
+  
   console.log("Active questions:", activeQuestions);
   console.log("Active questions length:", activeQuestions.length);
   
@@ -291,11 +298,17 @@ export default function ListeningTest() {
                 <p>Active questions count: {activeQuestions.length}</p>
                 <p>Has questions data: {questions?.sections ? 'Yes' : 'No'}</p>
                 <p>Has AI content: {listeningContent?.sections ? 'Yes' : 'No'}</p>
+                {listeningContent?.sections && (
+                  <p>AI sections count: {listeningContent.sections.length}</p>
+                )}
+                {listeningContent?.sections?.[currentSection] && (
+                  <p>AI current section questions: {listeningContent.sections[currentSection].questions?.length || 0}</p>
+                )}
               </div>
             </div>
 
             {/* Questions Panel - Enhanced UI */}
-            {activeQuestions.length > 0 && (
+            {(activeQuestions.length > 0 || (listeningContent?.sections && listeningContent.sections.length > 0)) && (
               <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
                 {/* Questions List - Main Panel */}
                 <div className="xl:col-span-3 space-y-4">

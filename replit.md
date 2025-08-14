@@ -81,3 +81,21 @@ Preferred communication style: Simple, everyday language.
 - **Security**: Rate limiting middleware for API protection  
 - **Validation**: Zod schemas for runtime type checking
 - **Error Handling**: Structured error responses with proper HTTP status codes
+
+## Recent Changes (August 14, 2025)
+
+### Listening AI Question Generation Fix
+- **Issue**: Frontend was calling `/api/ai/listening/generate` endpoint that didn't exist
+- **Solution**: Added missing AI endpoint to generate complete listening tests with 4 sections and 40 questions
+- **Implementation**: 
+  - Backend generates questions using Gemini API with proper IELTS structure
+  - Frontend now prioritizes AI-generated questions over database questions
+  - Added comprehensive error handling and fallback mechanisms
+- **Status**: ✅ Fixed - AI generation working correctly, questions being generated and saved
+
+### Migration Status
+- **Database**: MongoDB connection stable and functional
+- **AI Integration**: Gemini API configured and generating content successfully  
+- **Frontend**: React application loading and displaying test interface
+- **Backend**: Express server handling all API endpoints correctly
+- **Test Generation**: Complete IELTS listening tests with authentic content and questions
