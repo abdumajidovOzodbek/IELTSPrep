@@ -170,33 +170,33 @@ export default function ListeningTestPage() {
       <div className="flex flex-1">
         <TestNavigation currentSection="listening" sessionId={sessionId || ""} />
 
-        <main className="flex-1 p-8">
-          <div className="max-w-6xl mx-auto space-y-8">
-            {/* Section Header */}
-            <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-8">
-              <div className="flex items-center justify-between mb-6">
+        <main className="flex-1 p-4">
+          <div className="max-w-6xl mx-auto space-y-4">
+            {/* Compact Section Header */}
+            <div className="bg-white rounded-lg shadow-md border border-slate-200 p-4">
+              <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h1 className="text-3xl font-bold text-slate-900 mb-2">{sectionTitle}</h1>
-                  <p className="text-slate-600 text-lg">Section {currentSection + 1} of 4 • Questions {currentSection * 10 + 1}-{(currentSection + 1) * 10}</p>
+                  <h1 className="text-2xl font-bold text-slate-900 mb-1">{sectionTitle}</h1>
+                  <p className="text-slate-600">Section {currentSection + 1} of 4 • Questions {currentSection * 10 + 1}-{(currentSection + 1) * 10}</p>
                 </div>
-                <div className="text-right bg-primary/10 rounded-lg p-4">
-                  <div className="text-3xl font-bold text-primary">25:30</div>
-                  <div className="text-sm text-slate-600 font-medium">Time remaining</div>
+                <div className="text-right bg-primary/10 rounded-lg p-3">
+                  <div className="text-2xl font-bold text-primary">25:30</div>
+                  <div className="text-xs text-slate-600 font-medium">Time left</div>
                 </div>
               </div>
 
-              {/* Section Navigation */}
-              <div className="flex gap-3 mb-6">
+              {/* Compact Section Navigation */}
+              <div className="flex gap-2 mb-4">
                 {allSections.map((_: any, index: number) => (
                   <Button
                     key={index}
                     variant={index === currentSection ? "default" : "outline"}
-                    size="lg"
+                    size="sm"
                     onClick={() => goToSection(index)}
                     data-testid={`button-section-${index + 1}`}
-                    className={`px-6 py-3 font-semibold transition-all duration-200 ${
+                    className={`px-4 py-2 text-sm font-semibold transition-all ${
                       index === currentSection 
-                        ? "bg-primary hover:bg-primary/90 shadow-md" 
+                        ? "bg-primary hover:bg-primary/90" 
                         : "hover:bg-slate-50 hover:border-primary/50"
                     }`}
                   >
@@ -205,18 +205,18 @@ export default function ListeningTestPage() {
                 ))}
               </div>
 
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
-                <h3 className="font-bold text-blue-900 mb-3 text-lg flex items-center">
-                  <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm mr-2">i</span>
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-bold text-blue-900 mb-2 flex items-center">
+                  <span className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs mr-2">i</span>
                   Instructions
                 </h3>
-                <p className="text-blue-800 leading-relaxed">
+                <p className="text-blue-800 text-sm leading-relaxed">
                   {sectionInstructions}
                 </p>
                 {transcript && (
-                  <details className="mt-4">
-                    <summary className="cursor-pointer text-blue-900 font-semibold hover:text-blue-700 transition-colors">View Transcript (for development)</summary>
-                    <div className="mt-3 p-4 bg-white rounded-lg border text-sm text-slate-700 whitespace-pre-wrap shadow-sm">
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-blue-900 font-semibold hover:text-blue-700 transition-colors text-sm">View Transcript (for development)</summary>
+                    <div className="mt-2 p-3 bg-white rounded border text-xs text-slate-700 whitespace-pre-wrap max-h-32 overflow-y-auto">
                       {transcript}
                     </div>
                   </details>
@@ -225,47 +225,48 @@ export default function ListeningTestPage() {
             </div>
 
             {audioUrl ? (
-              <AudioPlayer
-                audioUrl={audioUrl}
-                isPlaying={false}
-                onPlayStateChange={() => {}}
-                allowSeeking={false}
-              />
+              <div className="bg-white rounded-lg shadow-md border border-slate-200 p-4">
+                <AudioPlayer
+                  audioUrl={audioUrl}
+                  isPlaying={false}
+                  onPlayStateChange={() => {}}
+                  allowSeeking={false}
+                />
+              </div>
             ) : (
-              <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-8">
-                <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center">
-                  <span className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm mr-3">♪</span>
+              <div className="bg-white rounded-lg shadow-md border border-slate-200 p-4">
+                <h3 className="text-lg font-bold text-slate-900 mb-3 flex items-center">
+                  <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs mr-2">♪</span>
                   Audio Player
                 </h3>
-                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-600"></div>
-                    <p className="text-amber-800 font-medium">
-                      AI is generating your personalized listening test with high-quality audio.
-                      This may take a moment...
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-600"></div>
+                    <p className="text-amber-800 text-sm">
+                      Generating audio content...
                     </p>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Questions Panel - Show all questions in current section */}
+            {/* Questions Panel - Compact Grid Layout */}
             {activeQuestions.length > 0 && (
-              <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
                 {/* Questions List - Main Panel */}
-                <div className="xl:col-span-3 space-y-6">
-                  <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-8">
-                    <div className="mb-8">
-                      <h3 className="text-2xl font-bold text-slate-900 mb-3">
+                <div className="xl:col-span-3">
+                  <div className="bg-white rounded-lg shadow-md border border-slate-200 p-4">
+                    <div className="mb-4">
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">
                         Questions {currentSection * 10 + 1}-{currentSection * 10 + activeQuestions.length}
                       </h3>
-                      <p className="text-slate-600 text-lg leading-relaxed">
-                        Answer all questions based on what you hear in the audio. You can answer in any order.
+                      <p className="text-slate-600 text-sm">
+                        Answer all questions based on what you hear in the audio.
                       </p>
                     </div>
 
-                    {/* Display all questions in current section */}
-                    <div className="space-y-8">
+                    {/* Compact Grid Layout for Questions */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {activeQuestions.map((question: any, index: number) => {
                         const questionNumber = currentSection * 10 + index + 1;
                         const questionText = question?.content?.question || question?.question || '';
@@ -278,91 +279,80 @@ export default function ListeningTestPage() {
                         const isMultipleChoice = question?.content?.options && Array.isArray(question.content.options) && question.content.options.length > 0;
                         
                         return (
-                          <div key={question._id || index} className={`p-6 rounded-xl border-2 transition-all duration-200 ${
+                          <div key={question._id || index} className={`p-3 rounded-lg border transition-all duration-200 ${
                             isAnswered 
-                              ? 'border-green-200 bg-green-50' 
-                              : 'border-slate-200 bg-slate-50 hover:border-primary/30'
+                              ? 'border-green-300 bg-green-50' 
+                              : 'border-slate-200 bg-slate-50 hover:border-primary/40'
                           }`}>
-                            {/* Form Completion Style */}
+                            {/* Form Completion Style - Compact */}
                             {isFormCompletion && (
-                              <div className="flex items-start space-x-6">
-                                <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-full flex items-center justify-center text-lg font-bold shadow-md">
-                                  {questionNumber}
+                              <div className="space-y-2">
+                                <div className="flex items-center space-x-2">
+                                  <div className="flex-shrink-0 w-6 h-6 bg-teal-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                                    {questionNumber}
+                                  </div>
+                                  <span className="text-xs text-slate-500 font-medium">Form Completion</span>
                                 </div>
-                                <div className="flex-1">
-                                  <div 
-                                    className="text-slate-800 leading-relaxed text-lg"
-                                    dangerouslySetInnerHTML={{
-                                      __html: questionText.replace(
-                                        /_______+/g,
-                                        `<input 
-                                          type="text" 
-                                          value="${answers[question._id] || ''}"
-                                          style="
-                                            border: none; 
-                                            border-bottom: 2px solid #0891b2; 
-                                            background: transparent; 
-                                            padding: 2px 8px; 
-                                            min-width: 120px; 
-                                            font-size: inherit;
-                                            outline: none;
-                                            margin: 0 4px;
-                                          "
-                                          placeholder="..."
-                                          onchange="this.dispatchEvent(new CustomEvent('answer-change', {detail: {questionId: '${question._id}', value: this.value}}))"
-                                        />`
-                                      )
-                                    }}
-                                    onInput={(e: any) => {
-                                      if (e.target.tagName === 'INPUT') {
-                                        handleAnswerChange(question._id, e.target.value);
-                                      }
-                                    }}
-                                  />
-                                </div>
+                                <div 
+                                  className="text-slate-800 text-sm leading-relaxed"
+                                  dangerouslySetInnerHTML={{
+                                    __html: questionText.replace(
+                                      /_______+/g,
+                                      `<input 
+                                        type="text" 
+                                        value="${answers[question._id] || ''}"
+                                        style="
+                                          border: 1px solid #0891b2; 
+                                          background: white; 
+                                          padding: 4px 6px; 
+                                          min-width: 80px; 
+                                          font-size: 12px;
+                                          outline: none;
+                                          margin: 0 2px;
+                                          border-radius: 4px;
+                                        "
+                                        placeholder="..."
+                                        onchange="this.dispatchEvent(new CustomEvent('answer-change', {detail: {questionId: '${question._id}', value: this.value}}))"
+                                      />`
+                                    )
+                                  }}
+                                  onInput={(e: any) => {
+                                    if (e.target.tagName === 'INPUT') {
+                                      handleAnswerChange(question._id, e.target.value);
+                                    }
+                                  }}
+                                />
                               </div>
                             )}
 
-                            {/* Multiple Choice Style */}
+                            {/* Multiple Choice Style - Compact */}
                             {isMultipleChoice && !isFormCompletion && (
-                              <div>
-                                <div className="flex items-start space-x-6 mb-6">
-                                  <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-full flex items-center justify-center text-lg font-bold shadow-md">
+                              <div className="space-y-2">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <div className="flex-shrink-0 w-6 h-6 bg-teal-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
                                     {questionNumber}
                                   </div>
-                                  <div className="flex-1 text-slate-800 leading-relaxed text-lg font-medium">
-                                    {questionText}
-                                  </div>
+                                  <span className="text-xs text-slate-500 font-medium">Multiple Choice</span>
                                 </div>
+                                <p className="text-slate-800 text-sm font-medium mb-2">{questionText}</p>
                                 
-                                <div className="ml-16 space-y-4">
+                                <div className="space-y-1">
                                   {question.content.options.map((option: string, optIndex: number) => {
-                                    const letter = String.fromCharCode(65 + optIndex); // A, B, C, D
+                                    const letter = String.fromCharCode(65 + optIndex);
                                     const isSelected = answers[question._id] === letter;
                                     
                                     return (
-                                      <label key={optIndex} className={`flex items-start space-x-4 cursor-pointer group p-4 rounded-lg transition-all duration-200 ${
+                                      <label key={optIndex} className={`flex items-center space-x-2 cursor-pointer p-2 rounded transition-all ${
                                         isSelected 
-                                          ? 'bg-teal-50 border-2 border-teal-200' 
-                                          : 'hover:bg-slate-100 border-2 border-transparent'
+                                          ? 'bg-teal-100 border border-teal-300' 
+                                          : 'hover:bg-slate-100'
                                       }`}>
-                                        <div className="flex items-center space-x-4">
-                                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold transition-all ${
-                                            isSelected 
-                                              ? 'bg-teal-500 text-white shadow-md' 
-                                              : 'bg-slate-200 text-slate-700 group-hover:bg-slate-300'
-                                          }`}>
-                                            {letter}
-                                          </div>
-                                          <div className={`w-6 h-6 border-2 rounded-full transition-all ${
-                                            isSelected 
-                                              ? 'border-teal-500 bg-teal-500' 
-                                              : 'border-slate-300 group-hover:border-teal-300'
-                                          }`}>
-                                            {isSelected && (
-                                              <div className="w-full h-full bg-white rounded-full scale-50"></div>
-                                            )}
-                                          </div>
+                                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                                          isSelected 
+                                            ? 'bg-teal-500 text-white' 
+                                            : 'bg-slate-200 text-slate-600'
+                                        }`}>
+                                          {letter}
                                         </div>
                                         <input
                                           type="radio"
@@ -372,7 +362,7 @@ export default function ListeningTestPage() {
                                           onChange={(e) => handleAnswerChange(question._id, e.target.value)}
                                           className="sr-only"
                                         />
-                                        <span className="text-slate-700 leading-relaxed group-hover:text-slate-900 transition-colors text-lg">
+                                        <span className="text-slate-700 text-xs leading-relaxed flex-1">
                                           {option}
                                         </span>
                                       </label>
@@ -382,39 +372,33 @@ export default function ListeningTestPage() {
                               </div>
                             )}
 
-                            {/* Fill in the blank style (sentence completion) */}
+                            {/* Fill in the blank style - Compact */}
                             {!isFormCompletion && !isMultipleChoice && (
-                              <div>
-                                <div className="flex items-start space-x-6 mb-4">
-                                  <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-full flex items-center justify-center text-lg font-bold shadow-md">
+                              <div className="space-y-2">
+                                <div className="flex items-center space-x-2">
+                                  <div className="flex-shrink-0 w-6 h-6 bg-teal-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
                                     {questionNumber}
                                   </div>
-                                  <div className="flex-1 text-slate-800 leading-relaxed text-lg font-medium">
-                                    {questionText}
-                                  </div>
+                                  <span className="text-xs text-slate-500 font-medium">Short Answer</span>
                                 </div>
-                                
-                                <div className="ml-16">
-                                  <input
-                                    type="text"
-                                    placeholder="Type your answer here..."
-                                    value={answers[question._id] || ''}
-                                    onChange={(e) => handleAnswerChange(question._id, e.target.value)}
-                                    className="border-2 border-teal-300 bg-white rounded-lg px-4 py-3 min-w-[300px] focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-200 text-slate-800 text-lg transition-all"
-                                    maxLength={50}
-                                  />
-                                </div>
+                                <p className="text-slate-800 text-sm font-medium">{questionText}</p>
+                                <input
+                                  type="text"
+                                  placeholder="Your answer..."
+                                  value={answers[question._id] || ''}
+                                  onChange={(e) => handleAnswerChange(question._id, e.target.value)}
+                                  className="w-full border border-teal-300 bg-white rounded px-2 py-1 text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-200"
+                                  maxLength={50}
+                                />
                               </div>
                             )}
 
-                            {/* Word limit reminder */}
+                            {/* Compact Word limit reminder */}
                             {!isMultipleChoice && (
-                              <div className="ml-16 mt-2">
-                                <div className="inline-block bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                                  <span className="text-sm text-red-700 font-semibold">
-                                    ⚠️ Write NO MORE THAN THREE WORDS AND/OR A NUMBER for each answer.
-                                  </span>
-                                </div>
+                              <div className="mt-1">
+                                <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
+                                  Max: 3 words/numbers
+                                </span>
                               </div>
                             )}
                           </div>
@@ -424,42 +408,40 @@ export default function ListeningTestPage() {
                   </div>
                 </div>
 
-                {/* Progress Panel - Right Sidebar */}
-                <div className="space-y-6">
+                {/* Compact Progress Panel - Right Sidebar */}
+                <div className="space-y-4">
                   {/* Section Progress */}
-                  <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6">
-                    <h4 className="font-bold text-slate-900 mb-4 text-lg">Test Progress</h4>
-                    <div className="space-y-3">
+                  <div className="bg-white rounded-lg shadow-md border border-slate-200 p-4">
+                    <h4 className="font-bold text-slate-900 mb-3 text-base">Progress</h4>
+                    <div className="space-y-2">
                       {allSections.map((section: any, index: number) => {
                         const sectionQuestions = section?.questions || [];
                         const sectionAnswered = sectionQuestions.filter((q: any) => answers[q._id]).length;
                         const isCurrentSection = index === currentSection;
                         return (
-                          <div key={index} className={`p-3 rounded-lg border transition-all ${isCurrentSection ? 'border-primary bg-primary/5' : 'border-slate-200'}`}>
-                            <div className="flex items-center justify-between mb-2">
-                              <span className={`font-medium ${isCurrentSection ? 'text-primary' : 'text-slate-700'}`}>
+                          <div key={index} className={`p-2 rounded border transition-all ${isCurrentSection ? 'border-primary bg-primary/5' : 'border-slate-200'}`}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className={`text-sm font-medium ${isCurrentSection ? 'text-primary' : 'text-slate-700'}`}>
                                 Section {index + 1}
                               </span>
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => goToSection(index)}
-                                className="text-xs"
+                                className="text-xs h-6 px-2"
                               >
-                                {isCurrentSection ? 'Current' : 'Go to'}
+                                {isCurrentSection ? 'Current' : 'Go'}
                               </Button>
                             </div>
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-xs text-slate-600">
-                                <span>Questions</span>
-                                <span>{sectionAnswered}/{sectionQuestions.length}</span>
-                              </div>
-                              <div className="w-full bg-slate-200 rounded-full h-2">
-                                <div 
-                                  className="bg-primary h-2 rounded-full transition-all"
-                                  style={{ width: `${sectionQuestions.length > 0 ? (sectionAnswered / sectionQuestions.length) * 100 : 0}%` }}
-                                ></div>
-                              </div>
+                            <div className="flex justify-between text-xs text-slate-600 mb-1">
+                              <span>Questions</span>
+                              <span>{sectionAnswered}/{sectionQuestions.length}</span>
+                            </div>
+                            <div className="w-full bg-slate-200 rounded-full h-1.5">
+                              <div 
+                                className="bg-primary h-1.5 rounded-full transition-all"
+                                style={{ width: `${sectionQuestions.length > 0 ? (sectionAnswered / sectionQuestions.length) * 100 : 0}%` }}
+                              ></div>
                             </div>
                           </div>
                         );
@@ -467,48 +449,48 @@ export default function ListeningTestPage() {
                     </div>
                   </div>
 
-                  {/* Navigation Controls */}
-                  <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6">
-                    <h4 className="font-bold text-slate-900 mb-4 text-lg">Navigation</h4>
-                    <div className="space-y-3">
+                  {/* Compact Navigation Controls */}
+                  <div className="bg-white rounded-lg shadow-md border border-slate-200 p-4">
+                    <h4 className="font-bold text-slate-900 mb-3 text-base">Navigation</h4>
+                    <div className="space-y-2">
                       <Button
                         onClick={handlePrevious}
                         disabled={currentSection === 0}
                         variant="outline"
-                        size="lg"
-                        className="w-full flex items-center justify-center py-3 text-base font-semibold hover:bg-slate-50 transition-all"
+                        size="sm"
+                        className="w-full flex items-center justify-center py-2 text-sm hover:bg-slate-50"
                       >
-                        <ChevronLeft className="h-5 w-5 mr-2" />
-                        Previous Section
+                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        Previous
                       </Button>
                       
                       <Button
                         onClick={handleNext}
-                        size="lg"
-                        className="w-full flex items-center justify-center py-3 text-base font-semibold bg-primary hover:bg-primary/90 shadow-md transition-all"
+                        size="sm"
+                        className="w-full flex items-center justify-center py-2 text-sm bg-primary hover:bg-primary/90"
                         disabled={currentSection === allSections.length - 1}
                       >
-                        {currentSection === allSections.length - 1 ? "Complete Test" : "Next Section"}
-                        <ChevronRight className="h-5 w-5 ml-2" />
+                        {currentSection === allSections.length - 1 ? "Complete" : "Next"}
+                        <ChevronRight className="h-4 w-4 ml-1" />
                       </Button>
                     </div>
                   </div>
 
-                  {/* Quick Stats */}
-                  <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6">
-                    <h4 className="font-bold text-slate-900 mb-4 text-lg">Quick Stats</h4>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                        <span className="text-slate-600 font-medium">Total Questions:</span>
-                        <span className="font-bold text-slate-900 text-lg">40</span>
+                  {/* Compact Quick Stats */}
+                  <div className="bg-white rounded-lg shadow-md border border-slate-200 p-4">
+                    <h4 className="font-bold text-slate-900 mb-3 text-base">Stats</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-600">Total:</span>
+                        <span className="font-bold text-slate-900">40</span>
                       </div>
-                      <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                        <span className="text-slate-600 font-medium">Current Section:</span>
-                        <span className="font-bold text-primary text-lg">{currentSection + 1} of 4</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-600">Section:</span>
+                        <span className="font-bold text-primary">{currentSection + 1}/4</span>
                       </div>
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-slate-600 font-medium">Section Questions:</span>
-                        <span className="font-bold text-slate-900 text-lg">{activeQuestions.length}</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-600">Questions:</span>
+                        <span className="font-bold text-slate-900">{activeQuestions.length}</span>
                       </div>
                     </div>
                   </div>
