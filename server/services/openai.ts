@@ -41,7 +41,7 @@ export interface SpeakingEvaluationResult {
 }
 
 export class GeminiService {
-  private model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+  private model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   private checkApiKey(): boolean {
     return !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY);
