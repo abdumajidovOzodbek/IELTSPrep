@@ -132,7 +132,7 @@ export default function ListeningTestPage() {
         currentSection: "reading",
         listeningCompleted: true 
       });
-      window.location.href = `/test/${sessionId}/reading`;
+      // Note: Navigation will be handled by the updateSession success callback
     }
   };
 

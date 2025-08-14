@@ -85,7 +85,7 @@ export default function ReadingTest() {
     } else {
       // All reading passages complete, auto-submit and move to writing
       // Submit all remaining answers before progressing
-      const unansweredQuestions = allPassages.flatMap(passage => 
+      const unansweredQuestions = allPassages.flatMap((passage: any) => 
         passage.questions?.filter((q: any) => !answers[q._id]) || []
       );
 
@@ -105,7 +105,7 @@ export default function ReadingTest() {
         currentSection: "writing",
         readingCompleted: true 
       });
-      window.location.href = `/test/${sessionId}/writing`;
+      // Note: Navigation will be handled by the updateSession success callback
     }
   };
 

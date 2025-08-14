@@ -33,7 +33,7 @@ export function useTestSession(sessionId?: string) {
         if (updatedSession.currentSection === 'completed') {
           setLocation(`/results/${sessionId}`);
         } else {
-          setLocation(`/${updatedSession.currentSection}/${sessionId}`);
+          setLocation(`/test/${sessionId}/${updatedSession.currentSection}`);
         }
       }
     },
