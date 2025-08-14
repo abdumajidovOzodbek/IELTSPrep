@@ -69,7 +69,7 @@ export default function ListeningTest() {
 
   const handleAnswerChange = (questionId: string, answer: any) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
-    
+
     // Auto-save answer with proper validation
     if (sessionId && questionId && answer) {
       submitAnswerMutation.mutate({
@@ -85,7 +85,7 @@ export default function ListeningTest() {
   // Use the properly structured IELTS 4-section format
   console.log("Generated AI Content:", listeningContent);
   console.log("Questions API Response:", questions);
-  
+
   // Get all 4 sections from AI generated content or API
   const allSections = listeningContent?.sections || questions?.sections || [];
   const currentSectionData = allSections[currentSection];
@@ -94,7 +94,7 @@ export default function ListeningTest() {
   const sectionInstructions = currentSectionData?.instructions || "Listen carefully and answer all questions.";
   const transcript = currentSectionData?.transcript || "";
   const audioUrl = currentSectionData?.audioUrl;
-  
+
   const handleNext = () => {
     if (currentQuestion < activeQuestions.length - 1) {
       setCurrentQuestion(prev => prev + 1);
@@ -163,10 +163,10 @@ export default function ListeningTest() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <TestHeader session={session} />
-      
+
       <div className="flex flex-1">
         <TestNavigation currentSection="listening" sessionId={sessionId} />
-        
+
         <main className="flex-1 p-6">
           <div className="max-w-5xl mx-auto space-y-6">
             {/* Section Header */}
@@ -196,7 +196,7 @@ export default function ListeningTest() {
                   </Button>
                 ))}
               </div>
-              
+
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h3 className="font-semibold text-blue-900 mb-2">Instructions</h3>
                 <p className="text-blue-800 text-sm">
@@ -214,7 +214,7 @@ export default function ListeningTest() {
             </div>
 
             {audioUrl ? (
-              <AudioPlayer 
+              <AudioPlayer
                 audioUrl={audioUrl}
                 isPlaying={false}
                 onPlayStateChange={() => {}}
@@ -225,7 +225,7 @@ export default function ListeningTest() {
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">Audio Player</h3>
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                   <p className="text-amber-800 text-sm">
-                    AI is generating your personalized listening test with high-quality audio. 
+                    AI is generating your personalized listening test with high-quality audio.
                     This may take a moment...
                   </p>
                 </div>
@@ -242,16 +242,16 @@ export default function ListeningTest() {
                     Section {currentSection + 1}, Question {currentQuestion + 1} of {activeQuestions.length}
                   </div>
                 </div>
-                
+
                 <div className="space-y-4">
                   <div className="text-slate-800 text-lg leading-relaxed">
                     {activeQuestions[currentQuestion]?.content?.question || activeQuestions[currentQuestion]?.question}
                   </div>
-                  
-                  {activeQuestions[currentQuestion]?.content?.options && (
+
+                  {activeQuestions[currentQuestion]?.content?.options && Array.isArray(activeQuestions[currentQuestion].content.options) && (
                     <div className="space-y-3">
                       {activeQuestions[currentQuestion].content.options.map((option: string, index: number) => (
-                        <label key={index} className="flex items-center space-x-3 cursor-pointer p-3 border border-slate-200 rounded-lg hover:bg-slate-50">
+                        <label key={index} className="flex items-center space-x-3 cursor-pointer p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
                           <input
                             type="radio"
                             name={`question-${currentSection}-${currentQuestion}`}
@@ -265,7 +265,7 @@ export default function ListeningTest() {
                       ))}
                     </div>
                   )}
-                  
+
                   {!activeQuestions[currentQuestion]?.content?.options && activeQuestions[currentQuestion]?.questionType === 'fill_blank' && (
                     <div className="space-y-2">
                       <input
@@ -278,10 +278,10 @@ export default function ListeningTest() {
                       />
                     </div>
                   )}
-                  
+
                   {/* Enhanced Navigation */}
                   <div className="flex justify-between items-center pt-6 border-t border-slate-200">
-                    <Button 
+                    <Button
                       onClick={handlePrevious}
                       disabled={currentQuestion === 0 && currentSection === 0}
                       variant="outline"
@@ -307,14 +307,14 @@ export default function ListeningTest() {
                         </Button>
                       ))}
                     </div>
-                    
-                    <Button 
+
+                    <Button
                       onClick={handleNext}
                       className="flex items-center"
                       data-testid="button-next"
                     >
-                      {currentQuestion === activeQuestions.length - 1 && currentSection === allSections.length - 1 
-                        ? "Complete Test" 
+                      {currentQuestion === activeQuestions.length - 1 && currentSection === allSections.length - 1
+                        ? "Complete Test"
                         : currentQuestion === activeQuestions.length - 1
                         ? "Next Section"
                         : "Next"}
