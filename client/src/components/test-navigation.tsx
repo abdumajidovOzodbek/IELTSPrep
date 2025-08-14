@@ -83,7 +83,7 @@ export default function TestNavigation({ currentSection, sessionId }: TestNaviga
   };
 
   return (
-    <aside className="w-64 bg-white shadow-sm border-r border-slate-200">
+    <aside className="fixed top-0 left-0 w-64 h-screen bg-white shadow-sm border-r border-slate-200 z-50 overflow-y-auto">
       <div className="p-4">
         <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-4">
           Test Sections

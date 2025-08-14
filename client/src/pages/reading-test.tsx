@@ -45,7 +45,7 @@ export default function ReadingTest() {
 
   const handleAnswerChange = (questionId: string, answer: any) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
-    
+
     submitAnswerMutation.mutate({
       sessionId,
       questionId,
@@ -197,11 +197,11 @@ export default function ReadingTest() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col">
       <TestHeader session={session} />
-      
+
       <div className="flex flex-1">
         <TestNavigation currentSection="reading" sessionId={sessionId || ""} />
-        
-        <main className="flex-1 p-4">
+
+        <main className="flex-1 p-4 ml-64">
           <div className="max-w-6xl mx-auto space-y-4">
             {/* Compact Section Header */}
             <div className="bg-white rounded-lg shadow-md border border-slate-200 p-4">
@@ -217,7 +217,7 @@ export default function ReadingTest() {
                   <div className="text-xs text-slate-600 font-medium">Time left</div>
                 </div>
               </div>
-              
+
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <h3 className="font-semibold text-blue-900 mb-2 text-sm">Instructions</h3>
                 <p className="text-blue-800 text-xs">{instructions}</p>
@@ -257,7 +257,7 @@ export default function ReadingTest() {
                   <div className="min-h-64">
                     {renderQuestion()}
                   </div>
-                  
+
                   {/* Navigation */}
                   <div className="flex justify-between items-center mt-8 pt-6 border-t border-slate-200">
                     <Button
@@ -270,18 +270,18 @@ export default function ReadingTest() {
                       <ChevronLeft className="h-4 w-4 mr-1" />
                       Previous
                     </Button>
-                    
+
                     <div className="text-sm text-slate-600">
                       Question {currentQuestion + 1} of {activeQuestions.length}
                     </div>
-                    
+
                     <Button
                       onClick={handleNext}
                       size="sm"
                       className="flex items-center bg-primary hover:bg-primary/90"
                     >
-                      {currentPassage === allPassages.length - 1 && currentQuestion === activeQuestions.length - 1 
-                        ? "Complete Reading" 
+                      {currentPassage === allPassages.length - 1 && currentQuestion === activeQuestions.length - 1
+                        ? "Complete Reading"
                         : "Next"}
                       <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>

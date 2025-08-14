@@ -169,7 +169,7 @@ export default function ListeningTestPage() {
       <div className="flex flex-1">
         <TestNavigation currentSection="listening" sessionId={sessionId || ""} />
 
-        <main className="flex-1 p-4">
+        <main className="flex-1 p-4 ml-64">
           <div className="max-w-6xl mx-auto space-y-4">
             {/* Compact Section Header */}
             <div className="bg-white rounded-lg shadow-md border border-slate-200 p-4">
@@ -194,8 +194,8 @@ export default function ListeningTestPage() {
                     onClick={() => goToSection(index)}
                     data-testid={`button-section-${index + 1}`}
                     className={`px-4 py-2 text-sm font-semibold transition-all ${
-                      index === currentSection 
-                        ? "bg-primary hover:bg-primary/90" 
+                      index === currentSection
+                        ? "bg-primary hover:bg-primary/90"
                         : "hover:bg-slate-50 hover:border-primary/50"
                     }`}
                   >
@@ -270,15 +270,15 @@ export default function ListeningTestPage() {
                         const questionNumber = currentSection * 10 + index + 1;
                         const questionText = question?.content?.question || question?.question || '';
                         const isAnswered = !!answers[question._id];
-                        
+
                         // Check question type
                         const isFormCompletion = question.questionType === 'form_completion' || questionText.includes('_______') || questionText.includes('__________');
                         const isMultipleChoice = question?.content?.options && Array.isArray(question.content.options) && question.content.options.length > 0;
-                        
+
                         return (
                           <div key={question._id || index} className={`p-3 rounded-lg border transition-all duration-200 ${
-                            isAnswered 
-                              ? 'border-green-300 bg-green-50' 
+                            isAnswered
+                              ? 'border-green-300 bg-green-50'
                               : 'border-slate-200 bg-slate-50 hover:border-primary/40'
                           }`}>
                             {/* Form Completion Style - Enhanced */}
@@ -290,7 +290,7 @@ export default function ListeningTestPage() {
                                   </div>
                                   <span className="text-xs text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded">Form Completion</span>
                                 </div>
-                                
+
                                 {/* Enhanced form completion with proper IELTS format */}
                                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
                                   <div className="mb-3">
@@ -298,7 +298,7 @@ export default function ListeningTestPage() {
                                       {question.formContext?.formTitle || "Application Form"}
                                     </h5>
                                   </div>
-                                  
+
                                   <div className="bg-white rounded-lg p-3 border border-blue-300 shadow-sm">
                                     <div className="flex items-center justify-between">
                                       <label className="text-slate-700 font-medium text-sm min-w-[100px]">
@@ -314,7 +314,7 @@ export default function ListeningTestPage() {
                                       />
                                     </div>
                                   </div>
-                                  
+
                                   {/* Show original question text if different from form field */}
                                   {questionText && questionText !== `${question.formContext?.fieldLabel}: _______` && (
                                     <div className="mt-2 text-xs text-blue-700 bg-blue-100 p-2 rounded">
@@ -335,21 +335,21 @@ export default function ListeningTestPage() {
                                   <span className="text-xs text-slate-500 font-medium">Multiple Choice</span>
                                 </div>
                                 <p className="text-slate-800 text-sm font-medium mb-2">{questionText}</p>
-                                
+
                                 <div className="space-y-1">
                                   {question.content.options.map((option: string, optIndex: number) => {
                                     const letter = String.fromCharCode(65 + optIndex);
                                     const isSelected = answers[question._id] === letter;
-                                    
+
                                     return (
                                       <label key={optIndex} className={`flex items-center space-x-2 cursor-pointer p-2 rounded transition-all ${
-                                        isSelected 
-                                          ? 'bg-teal-100 border border-teal-300' 
+                                        isSelected
+                                          ? 'bg-teal-100 border border-teal-300'
                                           : 'hover:bg-slate-100'
                                       }`}>
                                         <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                                          isSelected 
-                                            ? 'bg-teal-500 text-white' 
+                                          isSelected
+                                            ? 'bg-teal-500 text-white'
                                             : 'bg-slate-200 text-slate-600'
                                         }`}>
                                           {letter}
@@ -438,7 +438,7 @@ export default function ListeningTestPage() {
                               <span>{sectionAnswered}/{sectionQuestions.length}</span>
                             </div>
                             <div className="w-full bg-slate-200 rounded-full h-1.5">
-                              <div 
+                              <div
                                 className="bg-primary h-1.5 rounded-full transition-all"
                                 style={{ width: `${sectionQuestions.length > 0 ? (sectionAnswered / sectionQuestions.length) * 100 : 0}%` }}
                               ></div>
@@ -463,7 +463,7 @@ export default function ListeningTestPage() {
                         <ChevronLeft className="h-4 w-4 mr-1" />
                         Previous
                       </Button>
-                      
+
                       <Button
                         onClick={handleNext}
                         size="sm"
