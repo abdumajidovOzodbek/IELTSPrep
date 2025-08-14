@@ -144,8 +144,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Always generate content when uploading audio files
       if (req.file) {
-        // Transcribe audio
-        const transcriptionResult = await openaiService.transcribeAudio(req.file.buffer);
+        // Read audio file and transcribe
+        const fs = require('fs');
+        const audioFilePath = req.file.path;
+        const audioBuffer = fs.readFileSync(audioFilePath);
+        
+        const transcriptionResult = await openaiService.transcribeAudio(audioBuffer);
         if (!transcriptionResult.success) {
           throw new Error(`Transcription failed: ${transcriptionResult.error}`);
         }

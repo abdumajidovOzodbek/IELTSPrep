@@ -192,6 +192,10 @@ Output JSON only with fields:
       return { success: false, error: 'Gemini API key not configured' };
     }
 
+    if (!audioBuffer) {
+      return { success: false, error: 'No audio buffer provided' };
+    }
+
     try {
       // Convert audio buffer to base64 for Gemini processing
       const base64Audio = audioBuffer.toString('base64');
