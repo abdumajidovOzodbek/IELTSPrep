@@ -42,7 +42,7 @@ export interface SpeakingEvaluationResult {
 }
 
 export class GeminiService {
-  private model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+  private model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   private checkApiKey(): boolean {
     return !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY);
@@ -50,6 +50,16 @@ export class GeminiService {
 
   private handleError(error: any): AIResponse {
     console.error('Gemini AI Error:', error);
+    
+    // Check if it's a quota exceeded error
+    if (error.status === 429) {
+      return {
+        success: false,
+        error: 'API quota exceeded. Please wait a moment and try again.',
+        rawResponse: error
+      };
+    }
+    
     return {
       success: false,
       error: error.message || 'AI service unavailable',
