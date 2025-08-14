@@ -1,3 +1,4 @@
+
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Initialize Gemini AI with API key
@@ -41,7 +42,7 @@ export interface SpeakingEvaluationResult {
 }
 
 export class GeminiService {
-  private model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+  private model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   private checkApiKey(): boolean {
     return !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY);
@@ -49,7 +50,7 @@ export class GeminiService {
 
   private handleError(error: any): AIResponse {
     console.error('Gemini AI Error:', error);
-
+    
     // Check if it's a quota exceeded error
     if (error.status === 429) {
       return {
@@ -58,16 +59,7 @@ export class GeminiService {
         rawResponse: error
       };
     }
-
-    // Check for other common errors
-    if (error.status === 400) {
-      return {
-        success: false,
-        error: 'Invalid request format. Please check the input.',
-        rawResponse: error
-      };
-    }
-
+    
     return {
       success: false,
       error: error.message || 'AI service unavailable',
@@ -90,20 +82,9 @@ export class GeminiService {
       });
 
       const response = await result.response;
-      const responseText = response.text() || '';
-      
-      // Validate response is not empty
-      if (!responseText.trim()) {
-        return {
-          success: false,
-          error: 'AI returned empty response',
-          rawResponse: response
-        };
-      }
-
       return {
         success: true,
-        data: { text: responseText },
+        data: { text: response.text() || '' },
         rawResponse: response
       };
     } catch (error) {
@@ -148,7 +129,7 @@ Output JSON only with fields:
 
       const response = await result.response;
       const jsonResult = JSON.parse(response.text() || '{}');
-
+      
       return {
         success: true,
         data: jsonResult,
@@ -195,7 +176,7 @@ Output JSON only with fields:
 
       const response = await result.response;
       const jsonResult = JSON.parse(response.text() || '{}');
-
+      
       return {
         success: true,
         data: jsonResult,
@@ -218,16 +199,16 @@ Output JSON only with fields:
     try {
       // Convert audio buffer to base64 for Gemini processing
       const base64Audio = audioBuffer.toString('base64');
-
+      
       // Use Gemini to analyze the audio and provide transcription
       const prompt = `Please transcribe this audio file. Provide an accurate, word-for-word transcription of all speech in the audio. Include speaker identification if multiple speakers are present. Format as natural dialogue or monologue as appropriate.`;
 
       const result = await this.model.generateContent({
         contents: [{
-          role: "user",
+          role: "user", 
           parts: [
             { text: prompt },
-            {
+            { 
               inlineData: {
                 mimeType: "audio/mpeg", // Adjust based on actual audio format
                 data: base64Audio
@@ -282,7 +263,7 @@ Return JSON array only.`;
 
       const response = await result.response;
       const jsonResult = JSON.parse(response.text() || '[]');
-
+      
       return {
         success: true,
         data: jsonResult,
@@ -314,7 +295,7 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
 
       const response = await result.response;
       const jsonResult = JSON.parse(response.text() || '{}');
-
+      
       return {
         success: true,
         data: jsonResult,
@@ -340,52 +321,60 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
     }
 
     try {
-      const prompt = `Generate a complete IELTS Listening test with exactly 4 sections, 40 questions total (10 questions per section). Each section should have:
+      const prompt = `Generate a complete IELTS Listening test with exactly 4 sections, 40 questions total (10 questions per section). Follow the authentic IELTS format:
 
       Section 1: Everyday conversation (social survival) - 2 speakers
-      Section 2: Monologue in everyday context (social survival) - 1 speaker
-      Section 3: Academic conversation - up to 4 speakers
-      Section 4: Academic lecture or monologue - 1 speaker
+      - Form completion (Questions 1-5): Complete form with NO MORE THAN THREE WORDS AND/OR A NUMBER
+      - Multiple choice (Questions 6-7): Choose correct letters 
+      - Sentence completion (Questions 8-10): Fill blanks with NO MORE THAN THREE WORDS
 
-      Each section needs:
-      1. Realistic transcript (3-4 minutes of natural spoken content)
-      2. 10 questions using IELTS question types: multiple choice, form completion, note completion, table completion, labelling diagrams/maps, classification, matching, sentence completion
-      3. Progressive difficulty from Section 1 (easiest) to Section 4 (hardest)
+      Section 2: Monologue in everyday context - 1 speaker
+      - Note completion (Questions 11-20): Complete notes with NO MORE THAN THREE WORDS AND/OR A NUMBER
 
-      Return JSON format:
+      Section 3: Academic conversation - up to 4 speakers  
+      - Sentence completion (Questions 21-24): NO MORE THAN THREE WORDS AND/OR A NUMBER
+      - Chart completion (Questions 25-27): ONE WORD AND/OR A NUMBER
+      - Multiple choice (Questions 28-30): Choose THREE correct letters
+
+      Section 4: Academic lecture - 1 speaker
+      - Multiple choice (Questions 31-40): Choose correct letter A, B, C or D
+
+      Return JSON format with authentic IELTS question structures:
       {
         "sections": [
           {
             "sectionNumber": 1,
-            "title": "Section 1 - Everyday Conversation",
-            "instructions": "You will hear a conversation between...",
-            "transcript": "Speaker 1: Good morning, I'd like to make a reservation...",
+            "title": "Section 1",
+            "instructions": "You will hear a conversation between a student and a housing officer. First you have some time to look at questions 1 to 5.",
+            "transcript": "Housing Officer: Good morning, how can I help you?\\nStudent: I'd like to apply for accommodation...",
             "questions": [
               {
                 "_id": "q1",
-                "questionType": "multiple_choice",
+                "questionType": "form_completion",
                 "content": {
-                  "question": "What does the caller want to do?",
-                  "options": ["Make a reservation", "Cancel a booking", "Complain about service", "Get directions"]
+                  "question": "First name: _______",
+                  "wordLimit": "NO MORE THAN THREE WORDS AND/OR A NUMBER"
                 },
-                "correctAnswers": ["Make a reservation"],
+                "correctAnswers": ["answer"],
                 "orderIndex": 1
               },
               {
-                "_id": "q2",
-                "questionType": "fill_blank",
+                "_id": "q6", 
+                "questionType": "multiple_choice",
                 "content": {
-                  "question": "The booking is for _______ people."
+                  "question": "Which TWO things does the student prefer?",
+                  "options": ["A quiet environment", "B shared facilities", "C private bathroom", "D cooking facilities"],
+                  "selectMultiple": 2
                 },
-                "correctAnswers": ["two", "2"],
-                "orderIndex": 2
+                "correctAnswers": ["A", "C"],
+                "orderIndex": 6
               }
             ]
           }
         ]
       }
 
-      Make it authentic IELTS Academic level content with natural speech patterns, realistic scenarios, and proper British/International English.`;
+      Make authentic IELTS content with realistic scenarios, proper British English, and exact IELTS question formats.`;
 
       const result = await this.model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -398,10 +387,10 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
 
       const response = await result.response;
       let responseText = response.text() || '{}';
-
+      
       // Clean any markdown code block wrappers
       responseText = responseText.replace(/```json\s*|\s*```/g, '').trim();
-
+      
       console.log("AI Generated Listening Content:", responseText.substring(0, 500) + "...");
       const content = JSON.parse(responseText);
 

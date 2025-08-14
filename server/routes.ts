@@ -177,14 +177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             break;
         }
 
-        // Try AI generation with retry and fallback to manual questions
-        let generatedContent = null;
-        const maxRetries = 2;
-        let retryCount = 0;
-
-        while (retryCount < maxRetries && !generatedContent) {
-          try {
-            const contentGenerationPrompt = `You are an expert IELTS test developer. Carefully analyze this audio transcript to create exactly 10 authentic IELTS listening questions for ${sectionDescription}.
+        const contentGenerationPrompt = `You are an expert IELTS test developer. Carefully analyze this audio transcript to create exactly 10 authentic IELTS listening questions for ${sectionDescription}.
 
 TRANSCRIPT ANALYSIS REQUIRED:
 "${transcript}"
@@ -209,7 +202,7 @@ ANSWER REQUIREMENTS:
 - For fill_blank: Use exact words/numbers from transcript (max 3 words)
 - For multiple_choice: Correct option must match transcript information exactly
 
-Return ONLY valid JSON:
+Return JSON format:
 {
   "sectionTitle": "Appropriate title for ${sectionDescription}",
   "instructions": "Listen to the ${sectionNum === 1 ? 'conversation' : sectionNum === 2 || sectionNum === 4 ? 'talk' : 'discussion'} and answer Questions ${(sectionNum-1)*10 + 1}-${sectionNum*10}. Write NO MORE THAN THREE WORDS AND/OR A NUMBER for each answer.",
@@ -217,64 +210,41 @@ Return ONLY valid JSON:
     {
       "questionType": "${questionTypes[0]}",
       "question": "Question based on specific transcript content",
-      "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"],
+      "options": ["A) Option 1", "B) Option 2", "C) Option 3", "D) Option 4"], // only for multiple_choice
       "correctAnswer": "Exact word/phrase from transcript",
       "orderIndex": 1
     }
+    // Continue for all 10 questions, ensuring each tests different transcript content
   ]
 }`;
-
-            console.log(`Generating AI content for section ${sectionNum} (attempt ${retryCount + 1})`);
-            const aiResponse = await openaiService.generateText(contentGenerationPrompt, {
-              maxTokens: 3000,
-              temperature: 0.7
-            });
-
-            if (aiResponse.success && aiResponse.data?.text) {
-              let cleanedResponse = aiResponse.data.text.trim();
-              
-              // Remove markdown code blocks
-              if (cleanedResponse.startsWith('```json')) {
-                cleanedResponse = cleanedResponse.replace(/```json\s*/, '').replace(/\s*```\s*$/, '');
-              } else if (cleanedResponse.startsWith('```')) {
-                cleanedResponse = cleanedResponse.replace(/```\s*/, '').replace(/\s*```\s*$/, '');
-              }
-
-              if (cleanedResponse) {
-                generatedContent = JSON.parse(cleanedResponse);
-                sectionTitle = generatedContent.sectionTitle;
-                instructions = generatedContent.instructions;
-                questions = generatedContent.questions;
-                console.log("Generated questions count:", questions?.length || 0);
-                break;
-              }
-            }
-          } catch (error) {
-            console.error(`AI generation attempt ${retryCount + 1} failed:`, error);
-            retryCount++;
-            
-            if (retryCount < maxRetries) {
-              console.log(`Retrying in 3 seconds...`);
-              await new Promise(resolve => setTimeout(resolve, 3000));
-            }
-          }
+        console.log("Generating AI content for section", sectionNum);
+        const aiResponse = await openaiService.generateText(contentGenerationPrompt);
+        if (!aiResponse.success) {
+          console.error("AI content generation failed:", aiResponse.error);
+          throw new Error(`AI content generation failed: ${aiResponse.error}`);
         }
 
-        // Fallback to manual questions if AI fails
-        if (!generatedContent || !questions || questions.length === 0) {
-          console.log("AI generation failed, using fallback questions for section", sectionNum);
-          
-          questions = Array.from({ length: 10 }, (_, i) => ({
-            questionType: questionTypes[i] || "fill_blank",
-            question: questionTypes[i] === "multiple_choice" 
-              ? `What is mentioned at ${i + 1} in the audio?`
-              : `Complete: The speaker mentions _______ (Question ${i + 1})`,
-            options: questionTypes[i] === "multiple_choice" 
-              ? ["A) First option", "B) Second option", "C) Third option", "D) Fourth option"]
-              : undefined,
-            correctAnswer: questionTypes[i] === "multiple_choice" ? "A) First option" : "answer",
-            orderIndex: i + 1
-          }));
+        let generatedContent;
+        try {
+          console.log("AI Response:", aiResponse.data?.text?.substring(0, 500));
+
+          // Clean the AI response - remove markdown code blocks if present
+          let cleanedResponse = aiResponse.data!.text;
+          if (cleanedResponse.startsWith('```json')) {
+            cleanedResponse = cleanedResponse.replace(/```json\s*/, '').replace(/\s*```\s*$/, '');
+          } else if (cleanedResponse.startsWith('```')) {
+            cleanedResponse = cleanedResponse.replace(/```\s*/, '').replace(/\s*```\s*$/, '');
+          }
+
+          generatedContent = JSON.parse(cleanedResponse);
+          sectionTitle = generatedContent.sectionTitle;
+          instructions = generatedContent.instructions;
+          questions = generatedContent.questions;
+          console.log("Generated questions count:", questions?.length || 0);
+        } catch (parseError) {
+          console.error("Failed to parse AI generated content:", parseError);
+          console.error("Raw AI response:", aiResponse.data?.text);
+          throw new Error("Failed to parse AI generated content.");
         }
       }
 
@@ -332,11 +302,10 @@ Return ONLY valid JSON:
 
       // Check if we have all 4 unique sections (1, 2, 3, 4)
       const sectionNumbers = new Set(existingSections.map(s => s.sectionNumber));
-      sectionNumbers.add(sectionNum); // Add current section
       const isTestComplete = sectionNumbers.size === 4;
 
       await storage.updateListeningTest(testId, {
-        sections: [...existingSections.map(s => s._id!), section._id!],
+        sections: existingSections.map(s => s._id!),
         status: isTestComplete ? "active" : "draft"
       });
 
