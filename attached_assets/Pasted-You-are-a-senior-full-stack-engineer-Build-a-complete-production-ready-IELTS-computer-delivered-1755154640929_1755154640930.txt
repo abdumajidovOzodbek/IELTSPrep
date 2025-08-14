@@ -1,0 +1,213 @@
+You are a senior full-stack engineer. Build a complete, production-ready **IELTS (computer-delivered) web application** using **React + TypeScript** (frontend) and **Node.js + TypeScript + Express** (backend) with **MongoDB**. This project MUST integrate **Gemini AI** (the user will provide a token) as the primary LLM/AI engine for the following responsibilities:
+
+- Generating Listening/Reading/ Writing tasks and question banks.
+- Handling audio playbacks, transcriptions, and automated answer generation/verification for Listening.
+- Generating Writing Task 1 & Task 2 prompts on demand.
+- Automatically grading Listening & Reading (objective) and *evaluating* Writing & Speaking using the IELTS band criteria supplied below.
+- Acting as the **virtual Examiner** in Speaking — conducting the live speaking interview (via WebRTC) or a recorded speaking assessment; generating examiner prompts and asking follow-up questions, and producing a structured evaluation.
+
+**Important:** store the Gemini token only on the backend as an environment variable (e.g., `GEMINI_API_KEY` and `GEMINI_API_URL` / `GEMINI_PROVIDER`). **Never expose the token to the frontend**. The backend must implement an abstraction layer `services/gemini.ts` (or `.js`) with these methods at minimum:
+
+1. `generateText(prompt: string, options?: {...}) => Promise<{ text: string, raw: any }>`
+2. `evaluateText(prompt: string, criteria: object) => Promise<{ scores: {...}, comments: string, raw: any }>`
+3. `transcribeAudio(audioBuffer, options?) => Promise<{ text: string, raw: any }>`
+4. `synthesizeSpeech(text: string, options?) => Promise<{ audioUrl: string | buffer, raw: any }>`
+5. `streamingAssistantConversation(sessionId, userAudioStream)` — helper to support live speaking with streaming STT/TTS (or a fallback described below)
+
+Implement the gemini service with a configurable provider layer so your app can switch between:
+- **Gemini** (preferred) using the user-provided token (env var),
+- and fallback **open-source** STT/TTS (Whisper for STT; Web Speech API or local TTS for examiner voice),
+- or a well-documented mock mode for offline dev.
+
+**Security**: store `GEMINI_API_KEY` only on server `.env` and reference it from `process.env.GEMINI_API_KEY`. Use server-side endpoints only to call Gemini.
+
+---
+
+## How Gemini is used per test flow (functional spec)
+
+### Listening
+- Admin uploads audio files (MP3/OGG). The candidate listens in-browser (audio served from backend). Candidate types/chooses answers in the UI.
+- **Gemini tasks**:
+  1. For each listening audio, call `transcribeAudio()` to get a clean transcript and automatically derive the _correct answers_ from the transcript using `generateText()` with a template prompt (see templates below).
+  2. During evaluation, server compares candidate answers to the correct answers; objective items are auto-scored.
+  3. Optionally: use `generateText()` for intelligent matching (synonym handling, numeric formats).
+- The app should **prevent seeking** if test rules require it. Audio stream must not allow skipping or downloading during an active session.
+
+### Reading
+- Admin uploads passages and questions. Candidate completes reading tasks on-screen.
+- **Gemini tasks**:
+  1. If the question bank has answer keys missing, use `generateText()` to generate expected answers and rationales from the passage.
+  2. Auto-score objective items (multiple choice, T/F/NG, completion) by direct comparison with the generated key and using a tolerant matching strategy (normalize whitespace, case, punctuation).
+
+### Writing
+- Candidate writes Task 1 & Task 2 (typed).
+- **Gemini tasks**:
+  1. After submission, call `evaluateText()` with a prompt template that instructs Gemini to score the writing on these IELTS criteria:
+     - Task Achievement (Task 1) / Task Response (Task 2)
+     - Coherence & Cohesion
+     - Lexical Resource
+     - Grammatical Range & Accuracy
+  2. Ask Gemini to return:
+     - A band score (0.0–9.0) for each criterion (in 0.25 increments if possible),
+     - A short explanation for each criterion,
+     - A composite writing band score and actionable feedback (what to improve).
+  3. Store Gemini’s evaluation as a draft; admin/examiner can override in the UI and provide final marks.
+
+### Speaking
+- Two modes must be supported:
+  A. **Live WebRTC examiner**: implement a small signaling server and a session where the examiner can join a candidate's room. The examiner can be:
+     - a human examiner (admin) OR
+     - an **AI examiner** (Gemini) — in AI mode:
+       - Candidate audio is streamed to server; server uses `transcribeAudio()` (Gemini STT or Whisper) to capture candidate speech and `generateText()` to produce next examiner prompt/questions and `synthesizeSpeech()` to play examiner audio to candidate. This can be implemented as a turn-based flow (candidate speaks, server transcribes, Gemini produces next question, server TTS plays it).
+       - Alternatively, for recorded speaking, candidate uploads recording; server uses `transcribeAudio()` and `evaluateText()` to score using the speaking rubric below.
+  B. **Recorded-only**: candidate records 2–3 minutes per topic and uploads; server runs evaluation via `transcribeAudio()` + `evaluateText()`.
+
+- **Speaking evaluation criteria** (Gemini must return numeric ratings and comments on each):
+  - Fluency & Coherence
+  - Lexical Resource
+  - Grammatical Range & Accuracy
+  - Pronunciation
+  - Provide a band per criterion and final speaking band.
+
+### Band calculation (overall)
+- Convert raw Listening and Reading scores (0–40) to band scores using a mapping table (example mapping must be included; see below).
+- Use Gemini for writing & speaking band suggestions, but admin can override.
+- Compute overall band = mean(listeningBand, readingBand, writingBand, speakingBand).
+- Rounding rules: If average ends in `.25` → round up to `.5`; `.75` → round up to next integer. Example: 6.25 -> 6.5 ; 6.75 -> 7.0.
+- Include these mapping tables and rounding logic in backend.
+
+---
+
+## Prompt templates to use with Gemini
+
+**1) Create listening answer keys (from transcript)**
+System: You are an expert IELTS test item analyst.
+User: Given the following transcript of listening audio and the question list, extract concise answers suitable for auto-grading (for short answer and multiple choice). Return an array of {questionId, canonicalAnswer, answerType, notes}. Transcript: "<TRANSCRIPT_HERE>" Questions: <QUESTIONS_JSON>
+
+arduino
+Copy
+Edit
+
+**2) Evaluate Writing (Task 1 & Task 2)**
+System: You are an IELTS-certified examiner. Score the writing sample using the IELTS band descriptors. Provide numeric band (0.0 - 9.0) for each: Task Achievement/Response, Coherence & Cohesion, Lexical Resource, Grammatical Range & Accuracy. For each criterion, give a 1–2 sentence justification and a short list of 3 improvement suggestions. Finally provide the recommended overall writing band (rounded to nearest 0.5) and exact scoring breakdown in JSON.
+
+User: Here is the writing prompt: "<PROMPT_TEXT>". Candidate text: "<CANDIDATE_TEXT>". Output JSON only with fields:
+{
+"taskAchievement": number,
+"coherenceCohesion": number,
+"lexicalResource": number,
+"grammaticalRange": number,
+"overallWritingBand": number,
+"justifications": {
+"taskAchievement": "…",
+"coherenceCohesion": "…",
+...
+},
+"improvementTips": ["tip1","tip2","tip3"]
+}
+
+java
+Copy
+Edit
+
+**3) Evaluate Speaking (recorded or transcribed)**
+System: You are an experienced IELTS speaking examiner. Evaluate the candidate's spoken response (transcript and audio characteristics) by scoring: Fluency & Coherence, Lexical Resource, Grammatical Range & Accuracy, Pronunciation. For each criterion return a number (0.0–9.0), a short justification, and 3 short tips for improvement. Return JSON.
+
+User: Transcript: "<TRANSCRIPT>" (optionally include audio features: pauses per minute, speakingRate, pronunciationIssues). Return JSON only.
+
+java
+Copy
+Edit
+
+**4) AI Examiner (live roleplay) — next question generator**
+System: You are an IELTS speaking examiner in part X. Based on the conversation so far (the candidate's last turn transcript and the test stage), produce a natural follow-up question or prompt to keep the conversation flowing. Keep questions short and in examiner style. Provide two candidate-level variations: easier and harder.
+User: { "lastTranscript": "...", "part": 2, "context": "topic: ..."}
+
+markdown
+Copy
+Edit
+
+---
+
+## Listening/Reading raw-score → band mapping (example)
+Provide a mapping table in the backend file `lib/band-mapping.ts` with the following approximate mapping (developer may tweak, but include exactly this table as default):
+
+**Listening/Reading raw → band**
+- 39-40 -> 9.0
+- 37-38 -> 8.5
+- 35-36 -> 8.0
+- 33-34 -> 7.5
+- 30-32 -> 7.0
+- 27-29 -> 6.5
+- 23-26 -> 6.0
+- 20-22 -> 5.5
+- 16-19 -> 5.0
+- 13-15 -> 4.5
+- 10-12 -> 4.0
+- 7-9 -> 3.5
+- 5-6 -> 3.0
+- 3-4 -> 2.5
+- 1-2 -> 1.0
+- 0 -> 0.0
+
+**(Important)**: Persist this table and explain in README that it is an approximation and can be replaced/updated.
+
+---
+
+## Implementation & architecture notes (must)
+- Implement `services/gemini.ts` with functions: `generateText`, `evaluateText`, `transcribeAudio`, `synthesizeSpeech`. Each function must read `GEMINI_API_KEY` and `GEMINI_API_URL` from env and return standardized JSON described above.
+- The gemini service must expose a configurable `provider` option so the same function signatures work for other LLMs or for a local mock.
+- All calls to Gemini must be server-side; do not call from client.
+- Add rate-limiting on endpoints that call Gemini to avoid accidental token overuse.
+- Provide a `GEMINI_MODE` env var: `live|mock|fallback`. In `mock` mode, return deterministic canned responses for testing.
+- Provide Postman collection or OpenAPI spec that demonstrates calling the gemini-backed endpoints (for writing evaluation, speaking evaluation, generating tasks).
+- Add unit tests for `services/gemini` that run in `mock` mode.
+
+---
+
+## API contract updates (include gemini-backed endpoints)
+- POST `/api/gemini/health` -> checks connectivity (calls provider metadata).
+- POST `/api/gemini/evaluate/writing` -> body `{ sessionId, promptId, candidateText }`, returns Gemini JSON evaluation and stored result.
+- POST `/api/gemini/evaluate/speaking` -> body `{ sessionId, transcript, audioFeatures? }` -> returns evaluation.
+- POST `/api/gemini/transcribe` -> upload audio, returns transcript (used for listening & speaking).
+- POST `/api/gemini/synthesize` -> text -> returns audio playable URL (for AI examiner voice).
+
+---
+
+## Deliverables (must include Gemini integration)
+- Full source code (monorepo or two folders) with `services/gemini` implemented (with clear TODOs where provider-specific endpoint details must be filled).
+- `.env.example` listing:
+  - `GEMINI_API_KEY=your_token_here`
+  - `GEMINI_API_URL=https://your-gemini-endpoint.example` (or provider hint)
+  - `GEMINI_MODE=live|mock|fallback`
+- README describing how to configure the Gemini token, switching modes, cost-control tips and how to run in `mock` mode for testing without hitting the API.
+- Seed data as before; seed scripts should include sample audio and questions and include script to generate answer keys using the gemini service in `mock` or `live` mode.
+- Tests for gemini service (mock mode).
+- Example Gemini prompt requests (saved in repository) for auditability.
+
+---
+
+## Acceptance criteria (Gemini-specific)
+- With `GEMINI_MODE=mock`, `docker-compose up` allows you to exercise the full app (mock AI responses) without external calls.
+- With `GEMINI_MODE=live` and `GEMINI_API_KEY` set, the app:
+  - Uses Gemini to transcribe listening audio and derive correct answers.
+  - Uses Gemini to generate writing tasks and evaluate candidate writing according to the four criteria, returning band suggestions and explanations.
+  - Uses Gemini (or Gemini+TTS) to act as an AI speaking examiner — producing prompts and evaluating candidate responses.
+  - Stores Gemini results and allows admin override.
+
+---
+
+## Extra notes for the implementer
+- If Gemini does not expose direct speech-to-text or TTS in the target environment, implement a graceful fallback using open-source Whisper for STT and Web Speech API / local TTS for examiner voice. Keep the gemini service abstraction so the rest of the app is unaffected.
+- Provide logging and clear error handling when the Gemini provider fails (eg. quota exhausted).
+- Add rate-limit and usage dashboard for admin to see how many Gemini tokens/requests are used (important for cost control).
+- Explain privacy and consent in README: AI examiner and recording features must be opt-in and comply with privacy laws; store recordings only if candidate consents.
+
+---
+
+## Final note
+Follow the rest of the original project requirements (Docker, tests, endpoints, UI, scoring rules, admin grading UI, exports, seed data, README, etc.) and *make Gemini the authoritative AI engine* for generation and grading while providing fallback/mock modes for local development.
+
+If anything about Gemini's HTTP endpoint format is ambiguous, implement the `services/gemini` module so that the code is correct and documented but the exact provider URL and low-level request shaping can be completed by replacing a small provider adapter file. Provide clear examples and tests for that provider adapter.
+
+Produce the complete codebase, or—if unable to include full files inline—print the file tree and include full content of all key files (backend: gemini service, scoring, sessions; frontend: test runner, speaking UI, results page). End with exact commands to run locally and how to switch `GEMINI_MODE` between `mock` and `live`.
