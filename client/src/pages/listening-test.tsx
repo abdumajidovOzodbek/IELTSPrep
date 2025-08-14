@@ -292,56 +292,37 @@ export default function ListeningTestPage() {
                                   <span className="text-xs text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded">Form Completion</span>
                                 </div>
                                 
-                                {/* Render as form field if it has form context */}
-                                {question.formContext ? (
-                                  <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                                    <div className="grid grid-cols-1 gap-3">
-                                      <div className="flex items-center justify-between">
-                                        <label className="text-slate-700 font-medium text-sm">
-                                          {question.formContext.fieldLabel || question.question}
-                                        </label>
-                                        <input
-                                          type="text"
-                                          value={answers[question._id] || ''}
-                                          onChange={(e) => handleAnswerChange(question._id, e.target.value)}
-                                          className="border-b-2 border-blue-500 bg-transparent px-2 py-1 text-sm focus:outline-none focus:border-blue-600 min-w-[120px]"
-                                          placeholder="..."
-                                          maxLength={30}
-                                        />
-                                      </div>
+                                {/* Enhanced form completion with proper IELTS format */}
+                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                                  <div className="mb-3">
+                                    <h5 className="text-sm font-semibold text-blue-900 mb-2">
+                                      {question.formContext?.formTitle || "Application Form"}
+                                    </h5>
+                                  </div>
+                                  
+                                  <div className="bg-white rounded-lg p-3 border border-blue-300 shadow-sm">
+                                    <div className="flex items-center justify-between">
+                                      <label className="text-slate-700 font-medium text-sm min-w-[100px]">
+                                        {question.formContext?.fieldLabel || questionText.split(':')[0] || 'Field'}:
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={answers[question._id] || ''}
+                                        onChange={(e) => handleAnswerChange(question._id, e.target.value)}
+                                        className="border-b-2 border-blue-500 bg-transparent px-2 py-1 text-sm focus:outline-none focus:border-blue-600 min-w-[140px] flex-1 ml-3"
+                                        placeholder="..."
+                                        maxLength={30}
+                                      />
                                     </div>
                                   </div>
-                                ) : (
-                                  /* Fallback to inline form completion */
-                                  <div 
-                                    className="text-slate-800 text-sm leading-relaxed bg-slate-50 p-3 rounded-lg"
-                                    dangerouslySetInnerHTML={{
-                                      __html: questionText.replace(
-                                        /_______+/g,
-                                        `<input 
-                                          type="text" 
-                                          value="${answers[question._id] || ''}"
-                                          style="
-                                            border-bottom: 2px solid #2563eb; 
-                                            background: transparent; 
-                                            padding: 4px 8px; 
-                                            min-width: 100px; 
-                                            font-size: 13px;
-                                            outline: none;
-                                            margin: 0 4px;
-                                          "
-                                          placeholder="..."
-                                          onchange="this.dispatchEvent(new CustomEvent('answer-change', {detail: {questionId: '${question._id}', value: this.value}}))"
-                                        />`
-                                      )
-                                    }}
-                                    onInput={(e: any) => {
-                                      if (e.target.tagName === 'INPUT') {
-                                        handleAnswerChange(question._id, e.target.value);
-                                      }
-                                    }}
-                                  />
-                                )}
+                                  
+                                  {/* Show original question text if different from form field */}
+                                  {questionText && questionText !== `${question.formContext?.fieldLabel}: _______` && (
+                                    <div className="mt-2 text-xs text-blue-700 bg-blue-100 p-2 rounded">
+                                      <strong>Question:</strong> {questionText}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             )}
 

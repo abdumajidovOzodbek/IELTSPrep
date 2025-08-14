@@ -439,40 +439,51 @@ QUESTION DIFFICULTY PROGRESSION:
 - Questions 8-10: Challenging (inference, detailed understanding, multiple details)
 
 QUESTION TYPE SPECIFICATIONS:
-- form_completion: Create realistic form fields as they appear in IELTS Section 1. Use contexts like: application forms, booking forms, registration forms, membership forms, etc. Format each as "Field Label: _______" 
-- multiple_choice: Create 4 realistic options with ONLY ONE correct answer from transcript
-- fill_blank: Use words/phrases/numbers that are clearly spoken in the audio
+- form_completion: Create realistic form fields EXACTLY as they appear in IELTS Section 1. Each question must be a complete form field with label and blank space.
+- multiple_choice: Create 4 realistic options (A, B, C, D) with ONLY ONE correct answer from transcript
+- fill_blank: Use words/phrases/numbers that are clearly spoken in the audio (max 3 words)
 
-FORM COMPLETION CONTEXTS (Section 1):
-- Personal information forms (name, address, phone, email, age, occupation)
-- Booking/reservation forms (dates, times, numbers of people, special requirements)
-- Application forms (course enrollment, membership, job applications)
-- Registration forms (events, services, programs)
+FORM COMPLETION FORMAT (CRITICAL):
+For form_completion questions, create realistic form contexts like:
+- Personal information forms (registration, application, booking)
+- Each question should be formatted as: "Field Label: _______"
+- Extract exact answers from the transcript that would complete each form field
+- Common form fields: Name, Address, Phone number, Email, Date of birth, Occupation, etc.
 
 ANSWER REQUIREMENTS:
 - All answers must be directly extractable from the transcript
-- For form_completion: Use exact words/numbers from transcript, create realistic form labels like "First name:", "Telephone number:", "Date of birth:", etc.
+- For form_completion: Use exact words/numbers from transcript that complete the form field
 - For fill_blank: Use exact words/numbers from transcript (max 3 words)
 - For multiple_choice: Correct option must match transcript information exactly
 
-Return JSON format:
+Return JSON format with this EXACT structure:
 {
   "sectionTitle": "Appropriate title for ${sectionDescription}",
-  "instructions": "Listen to the ${sectionNum === 1 ? 'conversation' : sectionNum === 2 || sectionNum === 4 ? 'talk' : 'discussion'} and answer Questions ${(sectionNum-1)*10 + 1}-${sectionNum*10}. Write NO MORE THAN THREE WORDS AND/OR A NUMBER for each answer.",
-  "formTitle": "Application Form", // for form_completion sections
+  "instructions": "${sectionNum === 1 ? 'Complete the form below. Write NO MORE THAN THREE WORDS AND/OR A NUMBER for each answer.' : `Listen to the ${sectionNum === 2 || sectionNum === 4 ? 'talk' : 'discussion'} and answer Questions ${(sectionNum-1)*10 + 1}-${sectionNum*10}. Write NO MORE THAN THREE WORDS AND/OR A NUMBER for each answer.`}",
+  "formTitle": "${sectionNum === 1 ? 'Registration Form' : 'N/A'}",
   "questions": [
     {
-      "questionType": "${questionTypes[0]}",
-      "question": "First name: _______", // for form_completion, use realistic form field labels
-      "correctAnswer": "Exact word/phrase from transcript",
+      "questionType": "form_completion",
+      "question": "First name: _______",
+      "correctAnswer": "John",
       "orderIndex": 1,
-      "formContext": { // required for form_completion
-        "formTitle": "Course Application Form",
+      "formContext": {
+        "formTitle": "Registration Form",
         "fieldLabel": "First name",
         "fieldType": "text"
       }
+    },
+    {
+      "questionType": "form_completion", 
+      "question": "Telephone number: _______",
+      "correctAnswer": "0207 123 4567",
+      "orderIndex": 2,
+      "formContext": {
+        "formTitle": "Registration Form",
+        "fieldLabel": "Telephone number",
+        "fieldType": "text"
+      }
     }
-    // Continue for all 10 questions, ensuring each tests different transcript content
   ]
 }`;
 
@@ -507,25 +518,26 @@ Return JSON format:
 
             // Add formContext for form_completion questions
             if (finalQuestionType === "form_completion") {
+              const fieldLabel = q.question.includes(':') ? q.question.split(':')[0].trim() : q.formContext?.fieldLabel || "Form Field";
               return {
                 ...q,
                 questionType: finalQuestionType,
-                question: `${generatedQuestions.formTitle || "Form Field"}: _______`, // Default label if not explicitly set
+                question: q.question, // Keep the original question format
                 formContext: {
-                  formTitle: generatedQuestions.formTitle || "Generic Form",
-                  fieldLabel: q.question.split(':')[0] || "Form Field", // Extract label from question if present
-                  fieldType: "text" // Default type, can be inferred or set later
+                  formTitle: generatedQuestions.formTitle || q.formContext?.formTitle || "Application Form",
+                  fieldLabel: fieldLabel,
+                  fieldType: q.formContext?.fieldType || "text"
                 },
-                // Use correctAnswer directly if provided, otherwise assume it's in the question string
-                correctAnswer: q.correctAnswer || q.question.split(': ')[1]?.replace(' _______', '').trim() || 'N/A',
+                correctAnswer: q.correctAnswer || 'N/A',
+                orderIndex: index + 1
               };
             } else {
               // For other question types, ensure correct structure
               return {
                 ...q,
                 questionType: finalQuestionType,
-                correctAnswer: q.correctAnswer || 'N/A', // Ensure correctAnswer exists
-                orderIndex: index + 1 // Ensure orderIndex is sequential
+                correctAnswer: q.correctAnswer || 'N/A',
+                orderIndex: index + 1
               };
             }
           }),
