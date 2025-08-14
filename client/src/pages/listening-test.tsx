@@ -77,8 +77,7 @@ export default function ListeningTest() {
         questionId: questionId,
         answer: answer.toString().trim(),
         section: "listening",
-        timeSpent: 30, // Placeholder time
-        timestamp: new Date()
+        timeSpent: 30 // Placeholder time
       });
     }
   };
@@ -87,25 +86,24 @@ export default function ListeningTest() {
   console.log("Generated AI Content:", listeningContent);
   console.log("Questions API Response:", questions);
 
-  // Get all 4 sections from AI generated content or API
-  const allSections = listeningContent?.sections || questions?.sections || [];
-  console.log("All sections:", allSections);
-  console.log("Current section index:", currentSection);
+  // Get all 4 sections - prioritize AI content over database
+  let allSections = [];
+  let activeQuestions = [];
+  let currentSectionData = null;
   
-  const currentSectionData = allSections[currentSection];
-  console.log("Current section data:", currentSectionData);
-  
-  // Prioritize AI-generated questions if available, otherwise use database questions
-  let activeQuestions = currentSectionData?.questions || [];
-  
-  // If we have AI-generated content, use those questions
-  if (listeningContent?.sections && listeningContent.sections[currentSection]?.questions) {
-    activeQuestions = listeningContent.sections[currentSection].questions;
+  if (listeningContent?.sections && listeningContent.sections.length > 0) {
+    // Use AI-generated content
+    allSections = listeningContent.sections;
+    currentSectionData = allSections[currentSection];
+    activeQuestions = currentSectionData?.questions || [];
+    console.log("Using AI-generated questions:", activeQuestions.length);
+  } else if (questions?.sections && questions.sections.length > 0) {
+    // Use database content
+    allSections = questions.sections;
+    currentSectionData = allSections[currentSection];
+    activeQuestions = currentSectionData?.questions || [];
+    console.log("Using database questions:", activeQuestions.length);
   }
-  
-  console.log("Active questions:", activeQuestions);
-  console.log("Active questions length:", activeQuestions.length);
-  
   const sectionTitle = currentSectionData?.title || `Section ${currentSection + 1}`;
   const sectionInstructions = currentSectionData?.instructions || "Listen carefully and answer all questions.";
   const transcript = currentSectionData?.transcript || "";
@@ -192,7 +190,7 @@ export default function ListeningTest() {
       <TestHeader session={session} />
 
       <div className="flex flex-1">
-        <TestNavigation currentSection="listening" sessionId={sessionId || ""} />
+        <TestNavigation currentSection="listening" sessionId={sessionId} />
 
         <main className="flex-1 p-6">
           <div className="max-w-5xl mx-auto space-y-6">
@@ -211,7 +209,7 @@ export default function ListeningTest() {
 
               {/* Section Navigation */}
               <div className="flex gap-2 mb-4">
-                {allSections.map((_: any, index: number) => (
+                {allSections.map((_, index) => (
                   <Button
                     key={index}
                     variant={index === currentSection ? "default" : "outline"}
@@ -289,26 +287,8 @@ export default function ListeningTest() {
               )}
             </div>
 
-            {/* Debug Information */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-              <h3 className="font-semibold text-yellow-800 mb-2">Debug Info</h3>
-              <div className="text-sm text-yellow-700 space-y-1">
-                <p>All sections count: {allSections.length}</p>
-                <p>Current section index: {currentSection}</p>
-                <p>Active questions count: {activeQuestions.length}</p>
-                <p>Has questions data: {questions?.sections ? 'Yes' : 'No'}</p>
-                <p>Has AI content: {listeningContent?.sections ? 'Yes' : 'No'}</p>
-                {listeningContent?.sections && (
-                  <p>AI sections count: {listeningContent.sections.length}</p>
-                )}
-                {listeningContent?.sections?.[currentSection] && (
-                  <p>AI current section questions: {listeningContent.sections[currentSection].questions?.length || 0}</p>
-                )}
-              </div>
-            </div>
-
             {/* Questions Panel - Enhanced UI */}
-            {(activeQuestions.length > 0 || (listeningContent?.sections && listeningContent.sections.length > 0)) && (
+            {activeQuestions.length > 0 && (
               <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
                 {/* Questions List - Main Panel */}
                 <div className="xl:col-span-3 space-y-4">
@@ -359,20 +339,14 @@ export default function ListeningTest() {
                                 <div className="flex items-center space-x-2">
                                   <span className="text-xs px-2 py-1 bg-slate-100 text-slate-600 rounded">
                                     {question.questionType === 'multiple_choice' ? '🔘 Multiple Choice' : 
-                                     question.questionType === 'form_completion' ? '📋 Form Completion' :
-                                     question.questionType === 'table_completion' ? '📊 Table Completion' :
-                                     question.questionType === 'short_answer' ? '💬 Short Answer' :
-                                     question.questionType === 'note_completion' ? '📝 Note Completion' :
-                                     question.questionType === 'map_labelling' ? '🗺️ Map Labelling' :
-                                     question.questionType === 'matching' ? '🔗 Matching' :
-                                     question.questionType === 'summary_completion' ? '📄 Summary Completion' :
-                                     question.questionType === 'sentence_completion' ? '✍️ Sentence Completion' :
                                      question.questionType === 'fill_blank' ? '✏️ Fill in the Blank' :
+                                     question.questionType === 'short_answer' ? '💬 Short Answer' :
+                                     question.questionType === 'sentence_completion' ? '📝 Complete Sentence' :
                                      '❓ Question'}
                                   </span>
-                                  {(question?.content?.wordLimit || question.wordLimit) && (
+                                  {question.wordLimit && (
                                     <span className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded">
-                                      {question?.content?.wordLimit || question.wordLimit}
+                                      Limit: {question.wordLimit}
                                     </span>
                                   )}
                                 </div>
@@ -408,42 +382,24 @@ export default function ListeningTest() {
                                   </div>
                                 )}
 
-                                {/* Text input for form completion, note completion, etc. */}
+                                {/* Fill in the blank - Enhanced */}
                                 {(!question?.content?.options || question?.content?.options?.length === 0) && (
                                   <div className="space-y-3">
                                     <div className="max-w-lg">
-                                      {question.questionType === 'form_completion' ? (
-                                        <div className="bg-slate-50 border-2 border-slate-200 rounded-lg p-4">
-                                          <div className="text-sm font-medium text-slate-700 mb-2">Complete the form:</div>
-                                          <div className="flex items-center space-x-3">
-                                            <span className="text-slate-600">{question?.content?.question?.split('_______')[0] || ''}</span>
-                                            <input
-                                              type="text"
-                                              placeholder="Answer"
-                                              value={answers[question._id] || ''}
-                                              onChange={(e) => handleAnswerChange(question._id, e.target.value)}
-                                              className="flex-1 p-2 border-b-2 border-primary bg-transparent focus:outline-none focus:border-primary"
-                                              maxLength={50}
-                                            />
-                                            <span className="text-slate-600">{question?.content?.question?.split('_______')[1] || ''}</span>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <input
-                                          type="text"
-                                          placeholder="Type your answer here..."
-                                          value={answers[question._id] || ''}
-                                          onChange={(e) => handleAnswerChange(question._id, e.target.value)}
-                                          className="w-full p-4 text-lg border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-                                          maxLength={50}
-                                        />
-                                      )}
+                                      <input
+                                        type="text"
+                                        placeholder="Type your answer here..."
+                                        value={answers[question._id] || ''}
+                                        onChange={(e) => handleAnswerChange(question._id, e.target.value)}
+                                        className="w-full p-4 text-lg border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                                        maxLength={50}
+                                      />
                                       <div className="flex items-center justify-between mt-2">
                                         <p className="text-sm text-slate-500">
                                           💡 Write exactly what you hear
                                         </p>
                                         <p className="text-xs text-orange-600 font-medium">
-                                          {question?.content?.wordLimit || "Max: THREE WORDS AND/OR A NUMBER"}
+                                          Max: THREE WORDS AND/OR A NUMBER
                                         </p>
                                       </div>
                                     </div>
@@ -494,7 +450,7 @@ export default function ListeningTest() {
                   <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
                     <h4 className="font-semibold text-slate-900 mb-3">Test Progress</h4>
                     <div className="space-y-3">
-                      {allSections.map((section: any, index: number) => {
+                      {allSections.map((section, index) => {
                         const sectionQuestions = section?.questions || [];
                         const sectionAnswered = sectionQuestions.filter((q: any) => answers[q._id]).length;
                         const isCurrentSection = index === currentSection;

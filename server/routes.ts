@@ -156,7 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Generate section title and instructions with appropriate difficulty
         let sectionDescription = "";
-        let questionTypes: string[] = [];
+        let questionTypes = [];
 
         switch(sectionNum) {
           case 1:
@@ -291,32 +291,22 @@ Return ONLY valid JSON:
 
       const section = await storage.createListeningSection(sectionData);
 
-      // Save generated questions with proper structure
+      // Save generated questions
       const savedQuestions = [];
       console.log("Processing questions for saving:", questions.length);
       for (const qData of questions) {
         try {
-          console.log("Saving question:", qData.content?.question?.substring(0, 100) || qData.question?.substring(0, 100));
-          
-          // Handle different question formats
-          const questionContent = qData.content ? qData.content : {
-            question: qData.question,
-            options: qData.options,
-            wordLimit: qData.wordLimit
-          };
-
-          // Map old question types to new ones
-          let questionType = qData.questionType;
-          if (questionType === 'fill_blank') questionType = 'form_completion';
-          if (questionType === 'short_answer') questionType = 'short_answer';
-          
+          console.log("Saving question:", qData.question?.substring(0, 100));
           const questionSchema = insertTestQuestionSchema.parse({
             section: "listening",
-            questionType: questionType,
-            content: questionContent,
+            questionType: qData.questionType,
+            content: {
+              question: qData.question,
+              options: qData.options
+            },
             correctAnswers: Array.isArray(qData.correctAnswer) ?
-              qData.correctAnswer.map((ans: any) => typeof ans === 'object' ? JSON.stringify(ans) : String(ans)) :
-              [typeof qData.correctAnswer === 'object' ? JSON.stringify(qData.correctAnswer) : String(qData.correctAnswer)],
+            qData.correctAnswer.map(ans => typeof ans === 'object' ? JSON.stringify(ans) : String(ans)) :
+            [typeof qData.correctAnswer === 'object' ? JSON.stringify(qData.correctAnswer) : String(qData.correctAnswer)],
             orderIndex: qData.orderIndex,
             audioFileId: audioFile._id!,
             generatedBy: "ai"
@@ -326,7 +316,6 @@ Return ONLY valid JSON:
           console.log("Successfully saved question ID:", savedQuestion._id);
         } catch (error) {
           console.error("Error saving question:", error);
-          console.error("Question data:", qData);
         }
       }
 
@@ -782,105 +771,6 @@ Return a JSON array with this format:
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
-    }
-  });
-
-  // AI Listening Content Generation endpoint
-  app.post("/api/ai/listening/generate", aiRateLimit, async (req, res) => {
-    try {
-      console.log("AI listening generation requested");
-      const { sessionId, difficulty = "intermediate" } = req.body;
-
-      // Generate complete listening test using AI
-      const aiResponse = await openaiService.generateListeningContent();
-
-      if (!aiResponse.success) {
-        console.error("AI generation failed:", aiResponse.error);
-        
-        // Return fallback content with sample questions instead of error
-        const fallbackContent = {
-          sections: [
-            {
-              sectionNumber: 1,
-              title: "Section 1 - Everyday Conversation", 
-              instructions: "You will hear a conversation between two people making arrangements. Listen carefully and answer questions 1-10.",
-              transcript: "Sample conversation transcript...",
-              questions: Array.from({length: 10}, (_, i) => ({
-                _id: `fallback_q${i + 1}`,
-                questionType: i % 2 === 0 ? "multiple_choice" : "fill_blank",
-                content: {
-                  question: `Sample listening question ${i + 1}?`,
-                  options: i % 2 === 0 ? ["Option A", "Option B", "Option C", "Option D"] : undefined
-                },
-                correctAnswers: [i % 2 === 0 ? "Option A" : "answer"],
-                orderIndex: i + 1
-              }))
-            },
-            {
-              sectionNumber: 2,
-              title: "Section 2 - Monologue",
-              instructions: "You will hear a monologue about a local facility. Listen carefully and answer questions 11-20.",
-              transcript: "Sample monologue transcript...", 
-              questions: Array.from({length: 10}, (_, i) => ({
-                _id: `fallback_q${i + 11}`,
-                questionType: i % 2 === 0 ? "multiple_choice" : "fill_blank",
-                content: {
-                  question: `Sample listening question ${i + 11}?`,
-                  options: i % 2 === 0 ? ["Option A", "Option B", "Option C", "Option D"] : undefined
-                },
-                correctAnswers: [i % 2 === 0 ? "Option A" : "answer"],
-                orderIndex: i + 11
-              }))
-            },
-            {
-              sectionNumber: 3,
-              title: "Section 3 - Academic Discussion",
-              instructions: "You will hear a discussion between students and a tutor. Listen carefully and answer questions 21-30.",
-              transcript: "Sample academic discussion transcript...",
-              questions: Array.from({length: 10}, (_, i) => ({
-                _id: `fallback_q${i + 21}`,
-                questionType: i % 2 === 0 ? "multiple_choice" : "fill_blank", 
-                content: {
-                  question: `Sample listening question ${i + 21}?`,
-                  options: i % 2 === 0 ? ["Option A", "Option B", "Option C", "Option D"] : undefined
-                },
-                correctAnswers: [i % 2 === 0 ? "Option A" : "answer"],
-                orderIndex: i + 21
-              }))
-            },
-            {
-              sectionNumber: 4,
-              title: "Section 4 - Academic Lecture",
-              instructions: "You will hear a lecture on an academic topic. Listen carefully and answer questions 31-40.",
-              transcript: "Sample academic lecture transcript...",
-              questions: Array.from({length: 10}, (_, i) => ({
-                _id: `fallback_q${i + 31}`,
-                questionType: i % 2 === 0 ? "multiple_choice" : "fill_blank",
-                content: {
-                  question: `Sample listening question ${i + 31}?`, 
-                  options: i % 2 === 0 ? ["Option A", "Option B", "Option C", "Option D"] : undefined
-                },
-                correctAnswers: [i % 2 === 0 ? "Option A" : "answer"],
-                orderIndex: i + 31
-              }))
-            }
-          ]
-        };
-        
-        return res.json(fallbackContent);
-      }
-
-      console.log("AI generation successful, returning content");
-      res.json({
-        success: true,
-        ...aiResponse.data
-      });
-    } catch (error: any) {
-      console.error("AI listening generation error:", error);
-      res.status(500).json({ 
-        error: error.message,
-        fallback: true 
-      });
     }
   });
 

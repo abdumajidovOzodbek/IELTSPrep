@@ -1,9 +1,6 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
 
-// Define test section enum first
-export const testSectionSchema = z.enum(["listening", "reading", "writing", "speaking"]);
-
 // User schema
 export const userSchema = z.object({
   _id: z.instanceof(ObjectId).optional(),
@@ -20,7 +17,7 @@ export const testSessionSchema = z.object({
   userId: z.string(),
   testType: z.enum(["academic", "general"]),
   status: z.enum(["in_progress", "completed", "paused"]).default("in_progress"),
-  currentSection: testSectionSchema.default("listening"),
+  currentSection: z.enum(["listening", "reading", "writing", "speaking"]).default("listening"),
   startTime: z.date().default(() => new Date()),
   endTime: z.date().optional(),
   timeRemaining: z.number().optional(),
@@ -81,18 +78,16 @@ export const insertAudioFileSchema = audioFileSchema.omit({ _id: true, uploadedA
 // Test question schema
 export const testQuestionSchema = z.object({
   _id: z.instanceof(ObjectId).optional(),
-  section: testSectionSchema,
-  questionType: z.enum([
-    "multiple_choice", "essay", "fill_blank", "short_answer", "sentence_completion",
-    "form_completion", "table_completion", "note_completion", "map_labelling", 
-    "matching", "summary_completion"
-  ]),
+  section: z.enum(["listening", "reading", "writing", "speaking"]),
+  questionType: z.enum(["multiple_choice", "fill_blank", "short_answer", "essay", "speaking_task", "matching", "map_labeling"]),
   content: z.record(z.any()),
   correctAnswers: z.array(z.string()).optional(),
   orderIndex: z.number(),
-  audioFileId: z.instanceof(ObjectId).optional(),
+  audioFileId: z.instanceof(ObjectId).optional(), // Reference to audio file
+  passage: z.string().optional(),
+  isActive: z.boolean().default(true),
   generatedBy: z.enum(["admin", "ai"]).default("admin"),
-  createdAt: z.date().default(() => new Date())
+  createdAt: z.date().default(() => new Date()),
 });
 
 // Test answer schema
