@@ -59,6 +59,15 @@ export class GeminiService {
       };
     }
 
+    // Check for other common errors
+    if (error.status === 400) {
+      return {
+        success: false,
+        error: 'Invalid request format. Please check the input.',
+        rawResponse: error
+      };
+    }
+
     return {
       success: false,
       error: error.message || 'AI service unavailable',
@@ -81,9 +90,20 @@ export class GeminiService {
       });
 
       const response = await result.response;
+      const responseText = response.text() || '';
+      
+      // Validate response is not empty
+      if (!responseText.trim()) {
+        return {
+          success: false,
+          error: 'AI returned empty response',
+          rawResponse: response
+        };
+      }
+
       return {
         success: true,
-        data: { text: response.text() || '' },
+        data: { text: responseText },
         rawResponse: response
       };
     } catch (error) {

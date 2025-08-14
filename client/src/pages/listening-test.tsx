@@ -150,12 +150,23 @@ export default function ListeningTest() {
     </div>;
   }
 
-  // Show loading only if both AI content and fallback questions are loading
-  if (isGenerating && isLoading) {
+  // Show loading when data is being fetched
+  if (isLoading || (isGenerating && (!questions || !questions.sections))) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
         <p className="text-slate-600">Loading test questions...</p>
+        {isGenerating && <p className="text-sm text-slate-500 mt-2">Generating personalized content...</p>}
+      </div>
+    </div>;
+  }
+
+  // Show message when no tests are available
+  if (!isLoading && (!questions?.sections || questions.sections.length === 0)) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="text-center text-amber-600">
+        <p className="text-lg font-medium">No listening tests available</p>
+        <p className="text-sm mt-2">Please contact admin to upload test content</p>
       </div>
     </div>;
   }
