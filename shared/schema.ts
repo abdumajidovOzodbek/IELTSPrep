@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { ObjectId } from "mongodb";
 
+// Define test section enum first
+export const testSectionSchema = z.enum(["listening", "reading", "writing", "speaking"]);
+
 // User schema
 export const userSchema = z.object({
   _id: z.instanceof(ObjectId).optional(),
@@ -17,7 +20,7 @@ export const testSessionSchema = z.object({
   userId: z.string(),
   testType: z.enum(["academic", "general"]),
   status: z.enum(["in_progress", "completed", "paused"]).default("in_progress"),
-  currentSection: z.enum(["listening", "reading", "writing", "speaking"]).default("listening"),
+  currentSection: testSectionSchema.default("listening"),
   startTime: z.date().default(() => new Date()),
   endTime: z.date().optional(),
   timeRemaining: z.number().optional(),
