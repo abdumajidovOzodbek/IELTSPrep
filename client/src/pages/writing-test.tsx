@@ -145,15 +145,24 @@ export default function WritingTest() {
   const TASK2_PROMPT = "Some people think that universities should provide graduates with the knowledge and skills needed in the workplace. Others think that the true function of a university is to give access to knowledge for its own sake. What, in your opinion, should be the main function of a university?";
 
   useEffect(() => {
-    // If the session indicates we should be in speaking or beyond, redirect
-    if (session && session.currentSection === "speaking" && !session.writingCompleted) {
-      updateSession({ currentSection: "speaking", writingCompleted: true });
-      window.location.href = `/test/${sessionId}/speaking`;
-    } else if (session && session.currentSection === "reading") {
-       // If somehow we land on writing but session is already on reading, redirect
-       window.location.href = `/test/${sessionId}/reading`;
+    // Route protection: redirect if user tries to access wrong section
+    if (session) {
+      if (session.currentSection === "listening") {
+        // Still on listening, redirect back
+        window.location.href = `/test/${sessionId}/listening`;
+      } else if (session.currentSection === "reading") {
+        // Still on reading, redirect back  
+        window.location.href = `/test/${sessionId}/reading`;
+      } else if (session.currentSection === "speaking") {
+        // Already moved to speaking, redirect to speaking
+        window.location.href = `/test/${sessionId}/speaking`;
+      } else if (session.currentSection === "completed") {
+        // Test completed, redirect to results
+        window.location.href = `/results/${sessionId}`;
+      }
+      // Only allow access if currentSection is "writing"
     }
-  }, [session, sessionId, updateSession]);
+  }, [session, sessionId]);
 
 
   if (!session) {

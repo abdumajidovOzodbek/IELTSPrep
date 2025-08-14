@@ -105,6 +105,26 @@ export default function SpeakingTest() {
     </div>;
   }
 
+  // Route protection: redirect if user tries to access wrong section
+  useEffect(() => {
+    if (session) {
+      if (session.currentSection === "listening") {
+        // Still on listening, redirect back
+        window.location.href = `/test/${sessionId}/listening`;
+      } else if (session.currentSection === "reading") {
+        // Still on reading, redirect back
+        window.location.href = `/test/${sessionId}/reading`;
+      } else if (session.currentSection === "writing") {
+        // Still on writing, redirect back
+        window.location.href = `/test/${sessionId}/writing`;
+      } else if (session.currentSection === "completed") {
+        // Test completed, redirect to results
+        window.location.href = `/results/${sessionId}`;
+      }
+      // Only allow access if currentSection is "speaking"
+    }
+  }, [session, sessionId]);
+
   // Determine if the user can navigate back (only if not in speaking or speaking is not yet completed)
   const canGoBack = session.currentSection !== "speaking" || !session.speakingCompleted;
 
