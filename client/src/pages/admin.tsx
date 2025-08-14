@@ -46,19 +46,19 @@ export default function AdminDashboard() {
     instructions: ""
   });
 
-  const { data: stats } = useQuery({
+  const { data: stats } = useQuery<{ audioFiles?: number }>({
     queryKey: ["/api/admin/stats"],
   });
 
-  const { data: sessions = [] } = useQuery({
+  const { data: sessions = [] } = useQuery<any[]>({
     queryKey: ["/api/admin/sessions"],
   });
 
-  const { data: audioFiles = [] } = useQuery({
+  const { data: audioFiles = [] } = useQuery<any[]>({
     queryKey: ["/api/admin/audio/list"],
   });
 
-  const { data: listeningTests = [] } = useQuery({
+  const { data: listeningTests = [] } = useQuery<any[]>({
     queryKey: ["/api/admin/listening-tests"],
   });
 
@@ -228,6 +228,21 @@ export default function AdminDashboard() {
     try {
       setIsUploading(true);
       
+      // Validate that all 4 audio files are selected
+      const audioFiles: File[] = [];
+      for (let i = 1; i <= 4; i++) {
+        const audioInput = document.getElementById(`section-${i}-audio`) as HTMLInputElement;
+        if (!audioInput?.files?.[0]) {
+          toast({
+            title: "Missing Audio File",
+            description: `Please select an audio file for Section ${i}`,
+            variant: "destructive",
+          });
+          return;
+        }
+        audioFiles.push(audioInput.files[0]);
+      }
+      
       // First create the test
       const testResponse = await apiRequest("POST", "/api/admin/listening-tests", newTestData);
       const testData = await testResponse.json();
@@ -235,28 +250,29 @@ export default function AdminDashboard() {
       // Upload all 4 sections
       const sectionPromises = [];
       for (let i = 1; i <= 4; i++) {
-        const titleInput = document.getElementById(`section-${i}-title`) as HTMLInputElement;
-        const audioInput = document.getElementById(`section-${i}-audio`) as HTMLInputElement;
-        const instructionsInput = document.getElementById(`section-${i}-instructions`) as HTMLTextAreaElement;
-        
-        if (audioInput.files && audioInput.files[0]) {
-          const formData = new FormData();
-          formData.append("audio", audioInput.files[0]);
-          formData.append("sectionTitle", titleInput.value || `Section ${i}`);
-          formData.append("instructions", instructionsInput.value || `Listen and answer the questions for Section ${i}`);
-          formData.append("uploadedBy", "admin");
+        const formData = new FormData();
+        formData.append("audio", audioFiles[i - 1]);
+        formData.append("sectionTitle", `Section ${i}`);
+        formData.append("instructions", `Listen and answer the questions for Section ${i}`);
+        formData.append("uploadedBy", "admin");
 
-          const uploadPromise = fetch(`/api/admin/listening-tests/${testData.test._id}/sections/${i}/audio`, {
-            method: "POST",
-            body: formData,
-          });
-          
-          sectionPromises.push(uploadPromise);
-        }
+        const uploadPromise = fetch(`/api/admin/listening-tests/${testData.test._id}/sections/${i}/audio`, {
+          method: "POST",
+          body: formData,
+        });
+        
+        sectionPromises.push(uploadPromise);
       }
       
       // Wait for all sections to upload
-      await Promise.all(sectionPromises);
+      const responses = await Promise.all(sectionPromises);
+      
+      // Check if all uploads were successful
+      for (const response of responses) {
+        if (!response.ok) {
+          throw new Error(`Upload failed: ${await response.text()}`);
+        }
+      }
       
       toast({
         title: "Complete Test Created!",
@@ -268,19 +284,14 @@ export default function AdminDashboard() {
       
       // Clear all form inputs
       for (let i = 1; i <= 4; i++) {
-        const titleInput = document.getElementById(`section-${i}-title`) as HTMLInputElement;
         const audioInput = document.getElementById(`section-${i}-audio`) as HTMLInputElement;
-        const instructionsInput = document.getElementById(`section-${i}-instructions`) as HTMLTextAreaElement;
-        
-        if (titleInput) titleInput.value = "";
         if (audioInput) audioInput.value = "";
-        if (instructionsInput) instructionsInput.value = "";
       }
       
     } catch (error: any) {
       toast({
         title: "Upload Failed",
-        description: error.message,
+        description: error.message || "Failed to create complete test",
         variant: "destructive",
       });
     } finally {
