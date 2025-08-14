@@ -77,7 +77,8 @@ export default function ListeningTest() {
         questionId: questionId,
         answer: answer.toString().trim(),
         section: "listening",
-        timeSpent: 30 // Placeholder time
+        timeSpent: 30, // Placeholder time
+        timestamp: new Date()
       });
     }
   };
@@ -325,14 +326,20 @@ export default function ListeningTest() {
                                 <div className="flex items-center space-x-2">
                                   <span className="text-xs px-2 py-1 bg-slate-100 text-slate-600 rounded">
                                     {question.questionType === 'multiple_choice' ? '🔘 Multiple Choice' : 
-                                     question.questionType === 'fill_blank' ? '✏️ Fill in the Blank' :
+                                     question.questionType === 'form_completion' ? '📋 Form Completion' :
+                                     question.questionType === 'table_completion' ? '📊 Table Completion' :
                                      question.questionType === 'short_answer' ? '💬 Short Answer' :
-                                     question.questionType === 'sentence_completion' ? '📝 Complete Sentence' :
+                                     question.questionType === 'note_completion' ? '📝 Note Completion' :
+                                     question.questionType === 'map_labelling' ? '🗺️ Map Labelling' :
+                                     question.questionType === 'matching' ? '🔗 Matching' :
+                                     question.questionType === 'summary_completion' ? '📄 Summary Completion' :
+                                     question.questionType === 'sentence_completion' ? '✍️ Sentence Completion' :
+                                     question.questionType === 'fill_blank' ? '✏️ Fill in the Blank' :
                                      '❓ Question'}
                                   </span>
-                                  {question.wordLimit && (
+                                  {(question?.content?.wordLimit || question.wordLimit) && (
                                     <span className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded">
-                                      Limit: {question.wordLimit}
+                                      {question?.content?.wordLimit || question.wordLimit}
                                     </span>
                                   )}
                                 </div>
@@ -368,24 +375,42 @@ export default function ListeningTest() {
                                   </div>
                                 )}
 
-                                {/* Fill in the blank - Enhanced */}
+                                {/* Text input for form completion, note completion, etc. */}
                                 {(!question?.content?.options || question?.content?.options?.length === 0) && (
                                   <div className="space-y-3">
                                     <div className="max-w-lg">
-                                      <input
-                                        type="text"
-                                        placeholder="Type your answer here..."
-                                        value={answers[question._id] || ''}
-                                        onChange={(e) => handleAnswerChange(question._id, e.target.value)}
-                                        className="w-full p-4 text-lg border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-                                        maxLength={50}
-                                      />
+                                      {question.questionType === 'form_completion' ? (
+                                        <div className="bg-slate-50 border-2 border-slate-200 rounded-lg p-4">
+                                          <div className="text-sm font-medium text-slate-700 mb-2">Complete the form:</div>
+                                          <div className="flex items-center space-x-3">
+                                            <span className="text-slate-600">{question?.content?.question?.split('_______')[0] || ''}</span>
+                                            <input
+                                              type="text"
+                                              placeholder="Answer"
+                                              value={answers[question._id] || ''}
+                                              onChange={(e) => handleAnswerChange(question._id, e.target.value)}
+                                              className="flex-1 p-2 border-b-2 border-primary bg-transparent focus:outline-none focus:border-primary"
+                                              maxLength={50}
+                                            />
+                                            <span className="text-slate-600">{question?.content?.question?.split('_______')[1] || ''}</span>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <input
+                                          type="text"
+                                          placeholder="Type your answer here..."
+                                          value={answers[question._id] || ''}
+                                          onChange={(e) => handleAnswerChange(question._id, e.target.value)}
+                                          className="w-full p-4 text-lg border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                                          maxLength={50}
+                                        />
+                                      )}
                                       <div className="flex items-center justify-between mt-2">
                                         <p className="text-sm text-slate-500">
                                           💡 Write exactly what you hear
                                         </p>
                                         <p className="text-xs text-orange-600 font-medium">
-                                          Max: THREE WORDS AND/OR A NUMBER
+                                          {question?.content?.wordLimit || "Max: THREE WORDS AND/OR A NUMBER"}
                                         </p>
                                       </div>
                                     </div>

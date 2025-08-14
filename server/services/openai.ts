@@ -91,7 +91,7 @@ export class GeminiService {
 
       const response = await result.response;
       const responseText = response.text() || '';
-      
+
       // Validate response is not empty
       if (!responseText.trim()) {
         return {

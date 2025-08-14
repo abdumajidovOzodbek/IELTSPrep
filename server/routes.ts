@@ -291,22 +291,32 @@ Return ONLY valid JSON:
 
       const section = await storage.createListeningSection(sectionData);
 
-      // Save generated questions
+      // Save generated questions with proper structure
       const savedQuestions = [];
       console.log("Processing questions for saving:", questions.length);
       for (const qData of questions) {
         try {
-          console.log("Saving question:", qData.question?.substring(0, 100));
+          console.log("Saving question:", qData.content?.question?.substring(0, 100) || qData.question?.substring(0, 100));
+          
+          // Handle different question formats
+          const questionContent = qData.content ? qData.content : {
+            question: qData.question,
+            options: qData.options,
+            wordLimit: qData.wordLimit
+          };
+
+          // Map old question types to new ones
+          let questionType = qData.questionType;
+          if (questionType === 'fill_blank') questionType = 'form_completion';
+          if (questionType === 'short_answer') questionType = 'short_answer';
+          
           const questionSchema = insertTestQuestionSchema.parse({
             section: "listening",
-            questionType: qData.questionType,
-            content: {
-              question: qData.question,
-              options: qData.options
-            },
+            questionType: questionType,
+            content: questionContent,
             correctAnswers: Array.isArray(qData.correctAnswer) ?
-            qData.correctAnswer.map(ans => typeof ans === 'object' ? JSON.stringify(ans) : String(ans)) :
-            [typeof qData.correctAnswer === 'object' ? JSON.stringify(qData.correctAnswer) : String(qData.correctAnswer)],
+              qData.correctAnswer.map(ans => typeof ans === 'object' ? JSON.stringify(ans) : String(ans)) :
+              [typeof qData.correctAnswer === 'object' ? JSON.stringify(qData.correctAnswer) : String(qData.correctAnswer)],
             orderIndex: qData.orderIndex,
             audioFileId: audioFile._id!,
             generatedBy: "ai"
@@ -316,6 +326,7 @@ Return ONLY valid JSON:
           console.log("Successfully saved question ID:", savedQuestion._id);
         } catch (error) {
           console.error("Error saving question:", error);
+          console.error("Question data:", qData);
         }
       }
 

@@ -78,16 +78,18 @@ export const insertAudioFileSchema = audioFileSchema.omit({ _id: true, uploadedA
 // Test question schema
 export const testQuestionSchema = z.object({
   _id: z.instanceof(ObjectId).optional(),
-  section: z.enum(["listening", "reading", "writing", "speaking"]),
-  questionType: z.enum(["multiple_choice", "fill_blank", "short_answer", "essay", "speaking_task", "matching", "map_labeling"]),
+  section: testSectionSchema,
+  questionType: z.enum([
+    "multiple_choice", "essay", "fill_blank", "short_answer", "sentence_completion",
+    "form_completion", "table_completion", "note_completion", "map_labelling", 
+    "matching", "summary_completion"
+  ]),
   content: z.record(z.any()),
   correctAnswers: z.array(z.string()).optional(),
   orderIndex: z.number(),
-  audioFileId: z.instanceof(ObjectId).optional(), // Reference to audio file
-  passage: z.string().optional(),
-  isActive: z.boolean().default(true),
+  audioFileId: z.instanceof(ObjectId).optional(),
   generatedBy: z.enum(["admin", "ai"]).default("admin"),
-  createdAt: z.date().default(() => new Date()),
+  createdAt: z.date().default(() => new Date())
 });
 
 // Test answer schema
