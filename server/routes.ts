@@ -1453,22 +1453,86 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
       
       console.log("Answers by section:", Object.keys(answersBySection));
       
-      // Calculate scores for each section (simplified scoring for now)
+      // Debug: Show sample answers to understand the data
+      Object.keys(answersBySection).forEach(section => {
+        const sampleAnswers = answersBySection[section].slice(0, 3);
+        console.log(`Sample ${section} answers:`, sampleAnswers.map(a => ({
+          questionId: a.questionId,
+          answer: a.answer,
+          answerType: typeof a.answer,
+          answerLength: a.answer ? a.answer.toString().length : 0
+        })));
+      });
+      
+      // Calculate scores for each section based on actual content and correctness
       const sectionScores: any = {};
       
-      // For now, assign scores based on number of answers submitted
       Object.keys(answersBySection).forEach(section => {
         const sectionAnswers = answersBySection[section];
-        const answeredCount = sectionAnswers.filter(a => a.answer && a.answer.toString().trim() !== '').length;
+        console.log(`Evaluating ${section} section with ${sectionAnswers.length} total answers`);
         
-        // Simple scoring: percentage of questions answered converted to IELTS band
-        let band = 5.0; // Base score
-        if (answeredCount > 0) {
-          const completionRate = Math.min(answeredCount / 10, 1); // Assume 10 questions per section
-          band = 5.0 + (completionRate * 4.0); // Scale from 5.0 to 9.0
+        // Filter out empty/blank answers
+        const validAnswers = sectionAnswers.filter(a => {
+          const answer = a.answer ? a.answer.toString().trim() : '';
+          return answer !== '' && answer.length > 0;
+        });
+        
+        console.log(`Found ${validAnswers.length} non-empty answers in ${section}`);
+        
+        let band = 0; // Start with 0 for no answers
+        
+        if (validAnswers.length === 0) {
+          // No valid answers = band 0
+          band = 0;
+        } else {
+          // Calculate based on answer quality and completeness
+          const totalQuestions = sectionAnswers.length;
+          const answerRate = validAnswers.length / Math.max(totalQuestions, 10); // Minimum 10 questions expected
+          
+          // Basic scoring: start with answer completion rate
+          let baseScore = answerRate * 9.0; // Scale to max 9.0
+          
+          // Evaluate answer quality for different sections
+          if (section === 'writing') {
+            // For writing, check answer length and content quality
+            const avgLength = validAnswers.reduce((sum, a) => {
+              return sum + (a.answer ? a.answer.toString().length : 0);
+            }, 0) / validAnswers.length;
+            
+            // Minimum 150 words for Task 1, 250 for Task 2 (roughly 750-1250 characters)
+            if (avgLength < 100) baseScore *= 0.3; // Very short answers
+            else if (avgLength < 300) baseScore *= 0.6; // Short answers
+            else if (avgLength < 600) baseScore *= 0.8; // Adequate length
+            // Full score for longer answers
+            
+          } else if (section === 'speaking') {
+            // For speaking, similar length-based evaluation
+            const avgLength = validAnswers.reduce((sum, a) => {
+              return sum + (a.answer ? a.answer.toString().length : 0);
+            }, 0) / validAnswers.length;
+            
+            if (avgLength < 50) baseScore *= 0.3; // Very short responses
+            else if (avgLength < 150) baseScore *= 0.6; // Short responses
+            else if (avgLength < 300) baseScore *= 0.8; // Adequate responses
+            
+          } else {
+            // For listening/reading, penalize very short answers
+            const shortAnswers = validAnswers.filter(a => 
+              a.answer && a.answer.toString().trim().length < 2
+            ).length;
+            const shortAnswerPenalty = shortAnswers / validAnswers.length;
+            baseScore *= (1 - shortAnswerPenalty * 0.5); // Reduce score for short answers
+          }
+          
+          // Apply minimum threshold - if you don't answer enough, you can't get high scores
+          if (answerRate < 0.3) baseScore = Math.min(baseScore, 4.0); // Max 4.0 if <30% answered
+          if (answerRate < 0.5) baseScore = Math.min(baseScore, 5.5); // Max 5.5 if <50% answered
+          
+          band = Math.max(0, baseScore); // Ensure minimum 0
         }
         
         sectionScores[`${section}Band`] = Math.round(band * 2) / 2; // Round to nearest 0.5
+        console.log(`${section} section: ${validAnswers.length}/${sectionAnswers.length} valid answers, band: ${sectionScores[`${section}Band`]}`);
       });
       
       // Calculate overall band (average of all sections)
