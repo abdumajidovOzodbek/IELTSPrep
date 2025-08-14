@@ -828,7 +828,7 @@ Return a JSON array with this format:
         console.warn("AI generation failed, using fallback:", result.error);
         
         // Return a structured response indicating fallback mode
-        return res.json({
+        return res.status(503).json({
           success: false,
           fallback: true,
           message: "AI service temporarily unavailable. Using pre-defined test content.",

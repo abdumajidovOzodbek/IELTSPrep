@@ -154,6 +154,22 @@ export default function ListeningTestPage() {
     setCurrentQuestion(0);
   };
 
+  // Route protection: redirect if user tries to access completed sections
+  useEffect(() => {
+    if (session && session.currentSection !== "listening") {
+      // If the current section is beyond listening, redirect to current section
+      if (session.currentSection === "reading") {
+        window.location.href = `/test/${sessionId}/reading`;
+      } else if (session.currentSection === "writing") {
+        window.location.href = `/test/${sessionId}/writing`;
+      } else if (session.currentSection === "speaking") {
+        window.location.href = `/test/${sessionId}/speaking`;
+      } else if (session.currentSection === "completed") {
+        window.location.href = `/results/${sessionId}`;
+      }
+    }
+  }, [session, sessionId]);
+
   if (sessionLoading) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <div className="text-center">
@@ -180,22 +196,6 @@ export default function ListeningTestPage() {
       </div>
     </div>;
   }
-
-  // Route protection: redirect if user tries to access completed sections
-  useEffect(() => {
-    if (session && session.currentSection !== "listening") {
-      // If the current section is beyond listening, redirect to current section
-      if (session.currentSection === "reading") {
-        window.location.href = `/test/${sessionId}/reading`;
-      } else if (session.currentSection === "writing") {
-        window.location.href = `/test/${sessionId}/writing`;
-      } else if (session.currentSection === "speaking") {
-        window.location.href = `/test/${sessionId}/speaking`;
-      } else if (session.currentSection === "completed") {
-        window.location.href = `/results/${sessionId}`;
-      }
-    }
-  }, [session, sessionId]);
 
   // Show loading only if both AI content and fallback questions are loading
   if (isGenerating && isLoading) {

@@ -8,6 +8,15 @@ This is a full-stack IELTS (International English Language Testing System) compu
 
 Preferred communication style: Simple, everyday language.
 
+## Migration History
+
+**January 15, 2025**: Successfully migrated from Replit Agent to standard Replit environment
+- Fixed TypeScript errors in server routes
+- Enhanced AI service error handling with graceful fallback for overloaded services  
+- Resolved React hooks ordering issues in frontend components
+- Improved error handling for 503 service unavailable responses
+- All core functionality working with MongoDB and fallback question system
+
 ## System Architecture
 
 ### Frontend Architecture
