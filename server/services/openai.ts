@@ -314,6 +314,116 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
     };
   }
 
+  async generateReadingContent(): Promise<AIResponse<{ passages: Array<{ title: string; passage: string; questions: any[]; instructions?: string }> }>> {
+    if (!this.checkApiKey()) {
+      return { success: false, error: 'Gemini API key not configured' };
+    }
+
+    try {
+      const prompt = `Generate a complete IELTS Academic Reading test with exactly 3 passages, 40 questions total (approximately 13-14 questions per passage). Follow the authentic IELTS format:
+
+      PASSAGE 1: General interest topic (Questions 1-13)
+      - Mix of question types: multiple choice, true/false/not given, matching headings, sentence completion
+      - Academic level but accessible vocabulary
+      - Should be around 800-900 words
+
+      PASSAGE 2: Work-related topic (Questions 14-26) 
+      - More complex academic content
+      - Question types: matching information, summary completion, short answer questions
+      - Should be around 900-950 words
+
+      PASSAGE 3: Academic/scientific topic (Questions 27-40)
+      - Most challenging passage with complex academic vocabulary
+      - Question types: multiple choice, yes/no/not given, matching features, diagram labeling
+      - Should be around 950-1000 words
+
+      Return JSON format with authentic IELTS reading structures:
+      {
+        "passages": [
+          {
+            "passageNumber": 1,
+            "title": "The History of Chocolate",
+            "instructions": "Questions 1-13. Read the passage and answer the questions below.",
+            "passage": "Full passage text here with proper paragraphs...",
+            "questions": [
+              {
+                "_id": "q1",
+                "questionType": "multiple_choice",
+                "question": "According to the passage, chocolate was first...",
+                "options": ["A) used as currency", "B) eaten as food", "C) drunk as a beverage", "D) used in ceremonies"],
+                "correctAnswer": "C",
+                "orderIndex": 1
+              },
+              {
+                "_id": "q2", 
+                "questionType": "true_false",
+                "question": "The Aztecs were the first civilization to cultivate cacao beans.",
+                "correctAnswer": "FALSE",
+                "orderIndex": 2
+              },
+              {
+                "_id": "q3",
+                "questionType": "fill_blank", 
+                "question": "Complete the sentence: The Spanish conquistadors brought chocolate to _______ in the 16th century.",
+                "correctAnswer": "Europe",
+                "orderIndex": 3
+              }
+            ]
+          }
+        ]
+      }
+
+      Make authentic IELTS Academic reading content with:
+      - Academic vocabulary and complex sentence structures
+      - Factual, informative passages on varied topics
+      - Proper question distribution across different types
+      - Realistic difficulty progression from passage 1 to 3
+      - British English spelling and terminology`;
+
+      const result = await this.model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          maxOutputTokens: 8000,
+          temperature: 0.8,
+        },
+      });
+
+      const response = await result.response;
+      let responseText = response.text() || '{}';
+
+      // Clean any markdown code block wrappers
+      responseText = responseText.replace(/```json\s*|\s*```/g, '').trim();
+
+      console.log("AI Generated Reading Content:", responseText.substring(0, 500) + "...");
+      const content = JSON.parse(responseText);
+
+      // Process each passage to ensure proper question structure
+      const processedPassages = content.passages.map((passage: any, passageIndex: number) => {
+        const questionStartNum = passageIndex * 13 + 1; // Approximate question numbering
+        
+        return {
+          ...passage,
+          questions: passage.questions.map((q: any, index: number) => ({
+            ...q,
+            _id: q._id || `q${questionStartNum + index}`,
+            orderIndex: questionStartNum + index,
+            passageNumber: passageIndex + 1
+          }))
+        };
+      });
+
+      return {
+        success: true,
+        data: { passages: processedPassages },
+        rawResponse: response
+      };
+    } catch (error: any) {
+      console.error("Error in generateReadingContent:", error);
+      return this.handleError(error);
+    }
+  }
+
   async generateListeningContent(): Promise<AIResponse<{ sections: Array<{ title: string; transcript: string; questions: any[]; audioUrl?: string }> }>> {
     if (!this.checkApiKey()) {
       return { success: false, error: 'Gemini API key not configured' };

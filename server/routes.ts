@@ -763,6 +763,46 @@ Return a JSON array with this format:
     }
   });
 
+  // Generate AI listening content
+  app.post("/api/ai/listening/generate", async (req, res) => {
+    try {
+      console.log("Generating AI listening content...");
+
+      const result = await openaiService.generateListeningContent();
+
+      if (!result.success) {
+        console.error("AI generation failed:", result.error);
+        return res.status(500).json({ error: result.error });
+      }
+
+      console.log("AI listening content generated successfully");
+      res.json(result.data);
+    } catch (error: any) {
+      console.error("Error generating listening content:", error);
+      res.status(500).json({ error: "Failed to generate listening content" });
+    }
+  });
+
+  // Generate AI reading content
+  app.post("/api/ai/reading/generate", async (req, res) => {
+    try {
+      console.log("Generating AI reading content...");
+
+      const result = await openaiService.generateReadingContent();
+
+      if (!result.success) {
+        console.error("AI reading generation failed:", result.error);
+        return res.status(500).json({ error: result.error });
+      }
+
+      console.log("AI reading content generated successfully");
+      res.json(result.data);
+    } catch (error: any) {
+      console.error("Error generating reading content:", error);
+      res.status(500).json({ error: "Failed to generate reading content" });
+    }
+  });
+
   // Audio recordings
   app.post("/api/recordings", upload.single("audio"), async (req, res) => {
     try {
