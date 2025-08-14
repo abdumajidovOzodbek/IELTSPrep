@@ -120,8 +120,17 @@ export default function SpeakingTest() {
   }, [session, sessionId]);
 
   // Determine if the user can navigate back (only if not in speaking or speaking is not yet completed)
-  const canGoBack = session.currentSection !== "speaking" || !session.speakingCompleted;
+  const canGoBack = session ? (session.currentSection !== "speaking" || !session.speakingCompleted) : false;
 
+
+  if (!session) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+        <p className="text-slate-600">Loading session...</p>
+      </div>
+    </div>;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
