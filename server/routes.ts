@@ -698,9 +698,12 @@ Return a JSON array with this format:
       const answers = await storage.getSessionAnswers(sessionId);
       const questions = await storage.getTestQuestions(section);
 
-      const sectionAnswers = answers.filter(a =>
-        questions.some(q => q._id!.toString() === a.questionId)
-      );
+      const sectionAnswers = answers.filter(a => {
+        // Filter answers that belong to this section
+        if (a.section && a.section !== section) return false;
+        // Also check if questionId matches any question in this section
+        return questions.some(q => q._id!.toString() === a.questionId);
+      });
 
       if (section === 'listening' || section === 'reading') {
         const result = ScoringService.scoreObjectiveAnswers(sectionAnswers, questions);
@@ -1499,8 +1502,19 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
             console.log(`Found ${questions.length} questions for ${section}`);
 
             if (questions.length > 0) {
+              // Filter answers that actually belong to this section and have valid questionIds
+              const validSectionAnswers = sectionAnswers.filter(a => {
+                const hasValidQuestionId = questions.some(q => q._id!.toString() === a.questionId);
+                if (!hasValidQuestionId) {
+                  console.log(`Answer with questionId ${a.questionId} not found in ${section} questions`);
+                }
+                return hasValidQuestionId;
+              });
+
+              console.log(`${section}: Processing ${validSectionAnswers.length} valid answers out of ${sectionAnswers.length} total`);
+              
               // Use proper scoring service
-              const result = ScoringService.scoreObjectiveAnswers(sectionAnswers, questions);
+              const result = ScoringService.scoreObjectiveAnswers(validSectionAnswers, questions);
               // Use band mapping from band-mapping.ts
               band = rawScoreToBand(result.rawScore, section as 'listening' | 'reading');
               

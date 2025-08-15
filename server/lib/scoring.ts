@@ -16,12 +16,20 @@ export class ScoringService {
     let correctAnswers = 0;
     const totalQuestions = questions.length;
 
+    console.log(`Scoring ${answers.length} answers against ${questions.length} questions`);
+
     answers.forEach(answer => {
-      const question = questions.find(q => q.id === answer.questionId);
-      if (!question || !question.correctAnswers) return;
+      // Fix: Use _id instead of id for question matching
+      const question = questions.find(q => q._id?.toString() === answer.questionId);
+      if (!question || !question.correctAnswers) {
+        console.log(`No question found for answer with questionId: ${answer.questionId}`);
+        return;
+      }
 
       const userAnswer = this.normalizeAnswer(answer.answer as string);
       const correctAnswersList = question.correctAnswers as string[];
+      
+      console.log(`Checking answer "${userAnswer}" against correct answers:`, correctAnswersList);
       
       const isCorrect = correctAnswersList.some(correct => 
         this.compareAnswers(userAnswer, this.normalizeAnswer(correct))
@@ -29,6 +37,9 @@ export class ScoringService {
 
       if (isCorrect) {
         correctAnswers++;
+        console.log(`✓ Correct answer for question ${answer.questionId}`);
+      } else {
+        console.log(`✗ Incorrect answer for question ${answer.questionId}`);
       }
     });
 
