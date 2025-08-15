@@ -104,32 +104,38 @@ export default function Results() {
       console.log('Debug info:', data.debug);
       setSessionData({ ...session, ...data.scores }); // Update local state with new scores
       setDebugInfo(data.debug);
-      queryClient.invalidateQueries({ queryKey: [`/api/sessions/${sessionId}`] }); // Refetch session to ensure UI reflects changes
+      setLoading(false); // Explicitly stop loading
+      // Don't invalidate queries to prevent refetch loop
     },
     onError: (err: any) => {
       console.error("Error calculating scores:", err);
       setError("Could not calculate scores. Please try again.");
+      setLoading(false);
+      // If calculation fails, show the session data we have
+      if (session) {
+        setSessionData(session);
+      }
     }
   });
 
   // Effect to trigger score calculation if needed
   useEffect(() => {
-    if (session && !sessionLoading) {
+    if (session && !sessionLoading && !calculateScoresMutation.isPending) {
       const hasAnyBandScore = session.listeningBand || session.readingBand || session.writingBand || session.speakingBand;
-      // If no band scores are present, trigger calculation
-      if (!hasAnyBandScore && !calculateScoresMutation.isPending) {
+      
+      // Only trigger calculation once if no band scores are present
+      if (!hasAnyBandScore && !sessionData) {
         console.log("No band scores found, calculating based on actual answers...");
         calculateScoresMutation.mutate();
-      } else if (session.listeningBand || session.readingBand || session.writingBand || session.speakingBand) {
-        // If scores are already present, set them and debug info if available
+      } else if (hasAnyBandScore) {
+        // If scores are already present, set them and stop further calculations
         setSessionData(session);
-        // Try to get debug info from session if it's not already fetched via mutation response
         if (session.debugInfo && !debugInfo) {
-            setDebugInfo(session.debugInfo);
+          setDebugInfo(session.debugInfo);
         }
       }
     }
-  }, [session, sessionLoading, calculateScoresMutation.mutate, debugInfo]);
+  }, [session, sessionLoading]);
 
   // Update evaluations state when evaluations data is loaded
   useEffect(() => {
@@ -138,8 +144,8 @@ export default function Results() {
     }
   }, [evaluationsData]);
 
-  // Combined loading state
-  const isLoading = sessionLoading || evaluationsLoading || calculateScoresMutation.isPending;
+  // Combined loading state - but don't show loading if we already have session data
+  const isLoading = (sessionLoading || evaluationsLoading || calculateScoresMutation.isPending) && !sessionData;
 
   const getBandDescriptor = (band: number): string => {
     const descriptors: { [key: number]: string } = {
