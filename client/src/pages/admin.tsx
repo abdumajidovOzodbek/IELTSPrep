@@ -36,6 +36,11 @@ export default function AdminDashboard() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [transcript, setTranscript] = useState("");
   const [currentTest, setCurrentTest] = useState<any>(null);
+  const [uploadStatus, setUploadStatus] = useState("");
+  const [currentStep, setCurrentStep] = useState(1);
+  const [totalSteps, setTotalSteps] = useState(1);
+  const [estimatedTimeLeft, setEstimatedTimeLeft] = useState(0);
+  const [uploadStartTime, setUploadStartTime] = useState<number | null>(null);
   const [newTestData, setNewTestData] = useState({
     title: "",
     description: "",
@@ -287,9 +292,35 @@ export default function AdminDashboard() {
     setTranscript("");
   };
 
+  const updateProgress = (step: number, status: string, progress: number = 0) => {
+    setCurrentStep(step);
+    setUploadStatus(status);
+    setUploadProgress(progress);
+    
+    if (uploadStartTime && step > 1) {
+      const elapsed = Date.now() - uploadStartTime;
+      const estimatedTotal = (elapsed / (step - 1)) * totalSteps;
+      const remaining = Math.max(0, estimatedTotal - elapsed);
+      setEstimatedTimeLeft(Math.round(remaining / 1000));
+    }
+  };
+
+  const formatTimeLeft = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}m ${remainingSeconds}s`;
+  };
+
   const handleCreateCompleteTest = async () => {
     try {
       setIsUploading(true);
+      setUploadStartTime(Date.now());
+      setTotalSteps(6); // Create test + 4 sections + finalize
+      setCurrentStep(1);
+      setEstimatedTimeLeft(180); // Initial estimate: 3 minutes
+      
+      updateProgress(1, "Validating audio files...", 10);
       
       // Validate that all 4 audio files are selected
       const audioFiles: File[] = [];
@@ -301,41 +332,47 @@ export default function AdminDashboard() {
             description: `Please select an audio file for Section ${i}`,
             variant: "destructive",
           });
+          setIsUploading(false);
           return;
         }
         audioFiles.push(audioInput.files[0]);
       }
       
+      updateProgress(2, "Creating test structure...", 20);
+      
       // First create the test
       const testResponse = await apiRequest("POST", "/api/admin/listening-tests", newTestData);
       const testData = await testResponse.json();
       
-      // Upload all 4 sections
-      const sectionPromises = [];
+      // Upload all 4 sections with progress tracking
+      const responses = [];
       for (let i = 1; i <= 4; i++) {
+        updateProgress(2 + i, `Uploading Section ${i} audio and generating questions...`, 20 + (i * 15));
+        
         const formData = new FormData();
         formData.append("audio", audioFiles[i - 1]);
         formData.append("sectionTitle", `Section ${i}`);
         formData.append("instructions", `Listen and answer the questions for Section ${i}`);
         formData.append("uploadedBy", "admin");
 
-        const uploadPromise = fetch(`/api/admin/listening-tests/${testData.test._id}/sections/${i}/audio`, {
+        const response = await fetch(`/api/admin/listening-tests/${testData.test._id}/sections/${i}/audio`, {
           method: "POST",
           body: formData,
         });
         
-        sectionPromises.push(uploadPromise);
-      }
-      
-      // Wait for all sections to upload
-      const responses = await Promise.all(sectionPromises);
-      
-      // Check if all uploads were successful
-      for (const response of responses) {
+        responses.push(response);
+        
         if (!response.ok) {
-          throw new Error(`Upload failed: ${await response.text()}`);
+          throw new Error(`Section ${i} upload failed: ${await response.text()}`);
         }
       }
+      
+      updateProgress(6, "Finalizing test activation...", 95);
+      
+      // Small delay to show completion
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      updateProgress(6, "Test created successfully!", 100);
       
       toast({
         title: "Complete Test Created!",
@@ -359,12 +396,23 @@ export default function AdminDashboard() {
       });
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
+      setCurrentStep(1);
+      setUploadStatus("");
+      setEstimatedTimeLeft(0);
+      setUploadStartTime(null);
     }
   };
 
   const handleCreateCompleteReadingTest = async () => {
     try {
       setIsUploading(true);
+      setUploadStartTime(Date.now());
+      setTotalSteps(5); // Validate + create test + 3 passages
+      setCurrentStep(1);
+      setEstimatedTimeLeft(240); // Initial estimate: 4 minutes
+      
+      updateProgress(1, "Validating reading passages...", 10);
       
       // Validate that all 3 passages are filled
       const passages: Array<{title: string, content: string}> = [];
@@ -378,6 +426,7 @@ export default function AdminDashboard() {
             description: `Please fill in both title and content for Passage ${i}`,
             variant: "destructive",
           });
+          setIsUploading(false);
           return;
         }
         
@@ -387,6 +436,7 @@ export default function AdminDashboard() {
             description: `Passage ${i} should be at least 300 words for authentic IELTS questions`,
             variant: "destructive",
           });
+          setIsUploading(false);
           return;
         }
         
@@ -395,6 +445,8 @@ export default function AdminDashboard() {
           content: contentInput.value
         });
       }
+      
+      updateProgress(2, "Creating reading test structure and generating AI questions...", 20);
       
       // Create the reading test with all 3 passages
       const response = await apiRequest("POST", "/api/admin/reading-tests/bulk", {
@@ -430,6 +482,11 @@ export default function AdminDashboard() {
       });
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
+      setCurrentStep(1);
+      setUploadStatus("");
+      setEstimatedTimeLeft(0);
+      setUploadStartTime(null);
     }
   };
 
@@ -568,8 +625,49 @@ export default function AdminDashboard() {
                     disabled={!newTestData.title || isUploading}
                     className="w-full"
                   >
-                    {isUploading ? "Uploading & Generating..." : "Upload Audio Files & Let AI Create Test"}
+                    {isUploading ? "Processing..." : "Upload Audio Files & Let AI Create Test"}
                   </Button>
+
+                  {/* Progress Overlay */}
+                  {isUploading && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                      <Card className="w-96 max-w-[90vw]">
+                        <CardContent className="p-6">
+                          <div className="text-center space-y-4">
+                            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+                              <Upload className="h-8 w-8 text-blue-600 animate-pulse" />
+                            </div>
+                            
+                            <div>
+                              <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                                Creating Listening Test
+                              </h3>
+                              <p className="text-sm text-slate-600">
+                                {uploadStatus}
+                              </p>
+                            </div>
+
+                            <div className="space-y-3">
+                              <div className="flex justify-between text-sm text-slate-600">
+                                <span>Step {currentStep} of {totalSteps}</span>
+                                <span>
+                                  {estimatedTimeLeft > 0 ? `~${formatTimeLeft(estimatedTimeLeft)} left` : ''}
+                                </span>
+                              </div>
+                              <Progress value={uploadProgress} className="h-3" />
+                            </div>
+
+                            <div className="text-xs text-slate-500 space-y-1">
+                              <p>✓ AI is analyzing audio files</p>
+                              <p>✓ Generating transcripts</p>
+                              <p>✓ Creating IELTS-style questions</p>
+                              <p className="font-medium text-blue-600">Please don't close this window</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
                 </div>
               </DialogContent>
             </Dialog>
@@ -1138,8 +1236,49 @@ export default function AdminDashboard() {
                               disabled={!newTestData.title || isUploading}
                               className="w-full bg-blue-600 hover:bg-blue-700"
                             >
-                              {isUploading ? "Creating Test & Generating Questions..." : "Create Complete Reading Test"}
+                              {isUploading ? "Processing..." : "Create Complete Reading Test"}
                             </Button>
+
+                            {/* Progress Overlay for Reading Test */}
+                            {isUploading && (
+                              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                                <Card className="w-96 max-w-[90vw]">
+                                  <CardContent className="p-6">
+                                    <div className="text-center space-y-4">
+                                      <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+                                        <Sparkles className="h-8 w-8 text-blue-600 animate-pulse" />
+                                      </div>
+                                      
+                                      <div>
+                                        <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                                          Creating Reading Test
+                                        </h3>
+                                        <p className="text-sm text-slate-600">
+                                          {uploadStatus}
+                                        </p>
+                                      </div>
+
+                                      <div className="space-y-3">
+                                        <div className="flex justify-between text-sm text-slate-600">
+                                          <span>Step {currentStep} of {totalSteps}</span>
+                                          <span>
+                                            {estimatedTimeLeft > 0 ? `~${formatTimeLeft(estimatedTimeLeft)} left` : ''}
+                                          </span>
+                                        </div>
+                                        <Progress value={uploadProgress} className="h-3" />
+                                      </div>
+
+                                      <div className="text-xs text-slate-500 space-y-1">
+                                        <p>✓ AI is analyzing reading passages</p>
+                                        <p>✓ Generating authentic IELTS questions</p>
+                                        <p>✓ Creating mixed question types</p>
+                                        <p className="font-medium text-blue-600">This may take 2-4 minutes</p>
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              </div>
+                            )}
                             
                             <div className="text-xs text-center text-slate-500">
                               <p>If AI service is overloaded, you can create a test above and add passages individually.</p>
