@@ -102,7 +102,9 @@ export default function Results() {
     onSuccess: (data: any) => {
       console.log('Scores calculated:', data.scores);
       console.log('Debug info:', data.debug);
-      setSessionData({ ...session, ...data.scores }); // Update local state with new scores
+      // Merge session data with the new calculated scores
+      const updatedSession = { ...session, ...data.scores };
+      setSessionData(updatedSession);
       setDebugInfo(data.debug);
       setLoading(false); // Explicitly stop loading
       // Don't invalidate queries to prevent refetch loop
@@ -130,8 +132,8 @@ export default function Results() {
       } else if (hasAnyBandScore) {
         // If scores are already present, set them and stop further calculations
         setSessionData(session);
-        if (session.debugInfo && !debugInfo) {
-          setDebugInfo(session.debugInfo);
+        if ((session as any).debugInfo && !debugInfo) {
+          setDebugInfo((session as any).debugInfo);
         }
       }
     }
@@ -211,14 +213,28 @@ export default function Results() {
 
   const overallBand = sessionData.overallBand || 0;
 
-  // Calculate actual scores from debug info or use placeholder
+  // Calculate actual scores from session data or debug info
   const getActualScore = (section: string) => {
-    if (!debugInfo) return 'Not calculated';
-
     if (section === 'listening') {
-      return debugInfo.listeningScore || '0/40';
+      // Try to get from session data first
+      if (sessionData && 'listeningCorrect' in sessionData && 'listeningTotal' in sessionData) {
+        return `${(sessionData as any).listeningCorrect}/${(sessionData as any).listeningTotal}`;
+      }
+      // Fallback to debug info
+      if (debugInfo && debugInfo.listeningScore) {
+        return debugInfo.listeningScore;
+      }
+      return '0/40';
     } else if (section === 'reading') {
-      return debugInfo.readingScore || '0/40';
+      // Try to get from session data first
+      if (sessionData && 'readingCorrect' in sessionData && 'readingTotal' in sessionData) {
+        return `${(sessionData as any).readingCorrect}/${(sessionData as any).readingTotal}`;
+      }
+      // Fallback to debug info
+      if (debugInfo && debugInfo.readingScore) {
+        return debugInfo.readingScore;
+      }
+      return '0/40';
     }
     return 'AI Evaluated';
   };
