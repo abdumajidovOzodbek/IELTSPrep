@@ -595,16 +595,16 @@ Return a JSON array with this format:
         console.log("Looking for active reading tests...");
         const randomTest = await storage.getRandomReadingTest();
         console.log("Found reading test:", randomTest ? randomTest.title : "none");
-        
+
         if (!randomTest) {
           // Fallback to AI generated content if no tests available
           console.log("No reading tests found, using AI generation fallback");
           const result = await openaiService.generateReadingContent();
-          
+
           if (!result.success) {
             return res.status(404).json({ error: "No reading tests available and AI generation failed" });
           }
-          
+
           return res.json({
             testId: "ai-generated",
             testTitle: "AI Generated Reading Test",
@@ -842,7 +842,7 @@ Return a JSON array with this format:
 
       if (!result.success) {
         console.warn("AI generation failed, using fallback:", result.error);
-        
+
         // Return a structured response indicating fallback mode
         return res.status(503).json({
           success: false,
@@ -859,7 +859,7 @@ Return a JSON array with this format:
       });
     } catch (error: any) {
       console.error("Error generating listening content:", error);
-      
+
       // Fallback response for any unexpected errors
       res.json({
         success: false,
@@ -930,7 +930,7 @@ Return a JSON array with this format:
         // Define question types and difficulty for each passage
         let questionTypes: string[] = [];
         let passageDescription: string = "";
-        
+
         switch(passageNum) {
           case 1:
             questionTypes = ["multiple_choice", "multiple_choice", "multiple_choice", "fill_blank", "fill_blank", "multiple_choice", "fill_blank", "multiple_choice", "fill_blank", "multiple_choice", "fill_blank", "multiple_choice", "fill_blank"];
@@ -955,7 +955,7 @@ Content: "${passageData.content}"
 PASSAGE ${passageNum} REQUIREMENTS:
 ${passageNum === 1 ? `
 - General interest topic with moderate difficulty
-- Question types: multiple choice (4 options), true/false/not given, fill in blanks
+- Question types: multiple choice, true/false/not given, fill in blanks
 - Test main ideas, supporting details, and vocabulary in context
 - Questions should be clearly answerable from the passage
 ` : passageNum === 2 ? `
@@ -984,14 +984,7 @@ QUESTION TYPE SPECIFICATIONS:
 - short_answer: Require specific information from passage (maximum 3 words)
 - matching: Match headings, information, or features to appropriate sections/paragraphs
 
-ANSWER REQUIREMENTS:
-- All answers must be directly extractable from the passage text
-- For fill_blank/short_answer: Use exact words from passage, respecting word limits
-- For multiple_choice: Correct option must match passage information exactly
-- For matching: Ensure clear correspondence between items and passage sections
-
-IMPORTANT: Return ONLY valid JSON without any markdown code blocks or extra formatting. Do not wrap in \`\`\`json\`\`\`.
-
+Return JSON format:
 {
   "instructions": "Read the passage and answer Questions ${(passageNum-1)*13 + 1}-${passageNum*13 + (passageNum === 3 ? 1 : 0)}. Choose the correct letter A, B, C, or D for multiple choice questions. Write NO MORE THAN THREE WORDS for fill-in-the-blank questions.",
   "questions": [
@@ -1019,7 +1012,7 @@ QUALITY CHECKLIST:
           temperature: 0.3, // Lower temperature for more consistent IELTS questions
           maxRetries: 5 // More retries for bulk operation
         });
-        
+
         if (!aiResponse.success) {
           console.error(`AI content generation failed for passage ${passageNum}:`, aiResponse.error);
           throw new Error(`AI content generation failed for passage ${passageNum}: ${aiResponse.error}`);
@@ -1029,29 +1022,29 @@ QUALITY CHECKLIST:
         try {
           // Extract the text from the response structure
           let responseText = aiResponse.data?.text || aiResponse.data || "";
-          
+
           // Remove markdown code blocks if present
           if (typeof responseText === 'string') {
             responseText = responseText.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
-            
+
             // Try to extract JSON from the response
             const jsonMatch = responseText.match(/\{[\s\S]*\}/);
             const jsonText = jsonMatch ? jsonMatch[0] : responseText;
-          
+
             generatedContent = JSON.parse(jsonText);
           } else {
             generatedContent = responseText; // Assume it's already parsed
           }
-          
+
           // Validate that we have the required fields
           if (!generatedContent.questions || !Array.isArray(generatedContent.questions)) {
             throw new Error("AI response missing questions array");
           }
-          
+
         } catch (parseError) {
           console.error(`Failed to parse AI response for passage ${passageNum}:`, parseError);
           console.error(`Raw response:`, aiResponse.data);
-          
+
           // Create fallback questions as a last resort
           console.log(`Creating fallback questions for passage ${passageNum}`);
           generatedContent = {
@@ -1065,7 +1058,7 @@ QUALITY CHECKLIST:
               explanation: 'This question needs manual review due to AI parsing error.'
             }))
           };
-          
+
           console.log(`Created ${generatedContent.questions.length} fallback questions for passage ${passageNum}`);
         }
 
@@ -1082,11 +1075,11 @@ QUALITY CHECKLIST:
         // Save generated questions
         const savedQuestions = [];
         const questions = generatedContent.questions || [];
-        
+
         for (const qData of questions) {
           try {
             console.log(`Saving question for passage ${passageNum}:`, qData.question?.substring(0, 100));
-            const questionSchema = {
+            const questionSchema = insertTestQuestionSchema.parse({
               section: "reading" as const,
               questionType: qData.questionType,
               content: {
@@ -1100,8 +1093,7 @@ QUALITY CHECKLIST:
               passageId: savedPassage._id!,
               generatedBy: "ai" as const,
               isActive: true
-            };
-            
+            });
             const savedQuestion = await storage.createTestQuestion(questionSchema);
             savedQuestions.push(savedQuestion);
             console.log(`Successfully saved question ID: ${savedQuestion._id}`);
@@ -1119,7 +1111,7 @@ QUALITY CHECKLIST:
           ...savedPassage,
           questions: savedQuestions
         });
-        
+
         totalQuestions += savedQuestions.length;
       }
 
@@ -1280,7 +1272,7 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
       // Save generated questions
       const savedQuestions = [];
       const questions = generatedContent.questions || [];
-      
+
       for (const qData of questions) {
         try {
           console.log("Saving question:", qData.question?.substring(0, 100));
@@ -1434,15 +1426,15 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
     try {
       const { sessionId } = req.params;
       console.log("Calculating scores for session:", sessionId);
-      
+
       // Get all answers for this session
       const answers = await storage.getSessionAnswers(sessionId);
       console.log("Found answers:", answers.length);
-      
+
       if (answers.length === 0) {
         return res.status(400).json({ error: "No answers found for this session" });
       }
-      
+
       // Group answers by section
       const answersBySection = answers.reduce((acc, answer) => {
         const section = answer.section || 'unknown';
@@ -1450,9 +1442,9 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
         acc[section].push(answer);
         return acc;
       }, {} as Record<string, any[]>);
-      
+
       console.log("Answers by section:", Object.keys(answersBySection));
-      
+
       // Debug: Show sample answers to understand the data
       Object.keys(answersBySection).forEach(section => {
         const sampleAnswers = answersBySection[section].slice(0, 3);
@@ -1463,24 +1455,24 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
           answerLength: a.answer ? a.answer.toString().length : 0
         })));
       });
-      
+
       // Calculate scores for each section based on actual content and correctness
       const sectionScores: any = {};
-      
+
       Object.keys(answersBySection).forEach(section => {
         const sectionAnswers = answersBySection[section];
         console.log(`Evaluating ${section} section with ${sectionAnswers.length} total answers`);
-        
+
         // Filter out empty/blank answers
         const validAnswers = sectionAnswers.filter(a => {
           const answer = a.answer ? a.answer.toString().trim() : '';
           return answer !== '' && answer.length > 0;
         });
-        
+
         console.log(`Found ${validAnswers.length} non-empty answers in ${section}`);
-        
+
         let band = 0; // Start with 0 for no answers
-        
+
         if (validAnswers.length === 0) {
           // No valid answers = band 0
           band = 0;
@@ -1488,33 +1480,33 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
           // Calculate based on answer quality and completeness
           const totalQuestions = sectionAnswers.length;
           const answerRate = validAnswers.length / Math.max(totalQuestions, 10); // Minimum 10 questions expected
-          
+
           // Basic scoring: start with answer completion rate
           let baseScore = answerRate * 9.0; // Scale to max 9.0
-          
+
           // Evaluate answer quality for different sections
           if (section === 'writing') {
             // For writing, check answer length and content quality
             const avgLength = validAnswers.reduce((sum, a) => {
               return sum + (a.answer ? a.answer.toString().length : 0);
             }, 0) / validAnswers.length;
-            
+
             // Minimum 150 words for Task 1, 250 for Task 2 (roughly 750-1250 characters)
             if (avgLength < 100) baseScore *= 0.3; // Very short answers
             else if (avgLength < 300) baseScore *= 0.6; // Short answers
             else if (avgLength < 600) baseScore *= 0.8; // Adequate length
             // Full score for longer answers
-            
+
           } else if (section === 'speaking') {
             // For speaking, similar length-based evaluation
             const avgLength = validAnswers.reduce((sum, a) => {
               return sum + (a.answer ? a.answer.toString().length : 0);
             }, 0) / validAnswers.length;
-            
+
             if (avgLength < 50) baseScore *= 0.3; // Very short responses
             else if (avgLength < 150) baseScore *= 0.6; // Short responses
             else if (avgLength < 300) baseScore *= 0.8; // Adequate responses
-            
+
           } else {
             // For listening/reading, penalize very short answers
             const shortAnswers = validAnswers.filter(a => 
@@ -1523,30 +1515,30 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
             const shortAnswerPenalty = shortAnswers / validAnswers.length;
             baseScore *= (1 - shortAnswerPenalty * 0.5); // Reduce score for short answers
           }
-          
+
           // Apply minimum threshold - if you don't answer enough, you can't get high scores
           if (answerRate < 0.3) baseScore = Math.min(baseScore, 4.0); // Max 4.0 if <30% answered
           if (answerRate < 0.5) baseScore = Math.min(baseScore, 5.5); // Max 5.5 if <50% answered
-          
+
           band = Math.max(0, baseScore); // Ensure minimum 0
         }
-        
+
         sectionScores[`${section}Band`] = Math.round(band * 2) / 2; // Round to nearest 0.5
         console.log(`${section} section: ${validAnswers.length}/${sectionAnswers.length} valid answers, band: ${sectionScores[`${section}Band`]}`);
       });
-      
+
       // Calculate overall band (average of all sections)
       const bands = Object.values(sectionScores).filter(b => typeof b === 'number') as number[];
       const overallBand = bands.length > 0 ? 
         Math.round((bands.reduce((a, b) => a + b, 0) / bands.length) * 2) / 2 : 6.0;
-      
+
       sectionScores.overallBand = overallBand;
-      
+
       console.log("Calculated scores:", sectionScores);
-      
+
       // Update session with calculated scores
       const updatedSession = await storage.updateTestSession(sessionId, sectionScores);
-      
+
       res.json({
         message: "Scores calculated successfully",
         scores: sectionScores,
@@ -1597,25 +1589,149 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
         return res.status(404).json({ error: "Session not found" });
       }
 
-      if (session.listeningBand && session.readingBand && session.writingBand && session.speakingBand) {
-        const overallBand = calculateOverallBand(
-          session.listeningBand,
-          session.readingBand,
-          session.writingBand,
-          session.speakingBand
-        );
+      const sessionId = req.params.sessionId;
 
-        const updatedSession = await storage.updateTestSession(req.params.sessionId, {
-          overallBand,
-          status: "completed",
-          endTime: new Date()
-        });
+      // Get all answers for this session
+      const answers = await storage.getAnswersForSession(sessionId);
+      console.log(`Found ${answers.length} total answers for session`);
 
-        res.json(updatedSession);
-      } else {
-        res.status(400).json({ error: "Not all sections completed" });
+      // Group answers by section
+      const answersBySection = answers.reduce((acc, answer) => {
+        const section = answer.section || 'unknown';
+        if (!acc[section]) {
+          acc[section] = [];
+        }
+        acc[section].push(answer);
+        return acc;
+      }, {} as Record<string, any[]>);
+
+      console.log("Answers by section:", Object.keys(answersBySection).map(k => `${k}: ${answersBySection[k].length}`));
+
+      const sectionScores: any = {};
+
+      // Calculate band scores for each section
+      for (const section of Object.keys(answersBySection)) {
+        const sectionAnswers = answersBySection[section];
+        console.log(`Evaluating ${section} section with ${sectionAnswers.length} total answers`);
+
+        let band = 0;
+
+        if (section === 'listening' || section === 'reading') {
+          // For objective sections, use proper scoring
+          try {
+            // Get questions for this section to validate answers
+            const questions = await storage.getQuestionsBySection(section);
+            const relevantQuestions = questions.slice(0, Math.min(40, questions.length)); // Max 40 questions
+
+            if (relevantQuestions.length > 0) {
+              // Use the scoring service
+              const result = ScoringService.scoreObjectiveAnswers(sectionAnswers, relevantQuestions);
+              band = rawScoreToBand(result.rawScore, section as 'listening' | 'reading');
+
+              console.log(`${section}: ${result.correctAnswers}/${result.totalQuestions} correct, raw score: ${result.rawScore}, band: ${band}`);
+            } else {
+              // Fallback if no questions found
+              const validAnswers = sectionAnswers.filter(a => {
+                const answer = a.answer ? a.answer.toString().trim() : '';
+                return answer !== '' && answer.length > 0;
+              });
+
+              // Simple percentage-based calculation
+              const percentage = validAnswers.length / Math.max(sectionAnswers.length, 40);
+              const rawScore = Math.round(percentage * 40);
+              band = rawScoreToBand(rawScore, section as 'listening' | 'reading');
+            }
+          } catch (error) {
+            console.error(`Error scoring ${section}:`, error);
+            band = 0;
+          }
+        } else if (section === 'writing' || section === 'speaking') {
+          // For subjective sections, check if AI evaluation exists
+          try {
+            const evaluations = await storage.getEvaluationsForSession(sessionId, section);
+            if (evaluations && evaluations.length > 0) {
+              // Use AI evaluation score
+              const avgBand = evaluations.reduce((sum, eval) => sum + eval.bandScore, 0) / evaluations.length;
+              band = Math.round(avgBand * 2) / 2; // Round to nearest 0.5
+              console.log(`${section}: Using AI evaluation, band: ${band}`);
+            } else {
+              // Fallback: basic assessment based on answer quality
+              const validAnswers = sectionAnswers.filter(a => {
+                const answer = a.answer ? a.answer.toString().trim() : '';
+                return answer !== '' && answer.length > 0;
+              });
+
+              if (validAnswers.length === 0) {
+                band = 0;
+              } else {
+                const avgLength = validAnswers.reduce((sum, a) => {
+                  return sum + (a.answer ? a.answer.toString().length : 0);
+                }, 0) / validAnswers.length;
+
+                // Length-based scoring with more realistic thresholds
+                if (section === 'writing') {
+                  if (avgLength < 100) band = 2.0;
+                  else if (avgLength < 150) band = 3.5;
+                  else if (avgLength < 200) band = 5.0;
+                  else if (avgLength < 250) band = 6.0;
+                  else if (avgLength < 300) band = 7.0;
+                  else band = 7.5;
+                } else { // speaking
+                  if (avgLength < 30) band = 2.0;
+                  else if (avgLength < 60) band = 4.0;
+                  else if (avgLength < 100) band = 5.5;
+                  else if (avgLength < 150) band = 6.5;
+                  else band = 7.0;
+                }
+
+                // Consider completion rate
+                const completionRate = validAnswers.length / Math.max(sectionAnswers.length, 1);
+                if (completionRate < 0.5) band = Math.min(band, 4.0);
+                else if (completionRate < 0.8) band = Math.min(band, 6.0);
+              }
+              console.log(`${section}: Fallback scoring, band: ${band}`);
+            }
+          } catch (error) {
+            console.error(`Error evaluating ${section}:`, error);
+            band = 0;
+          }
+        }
+
+        sectionScores[`${section}Band`] = Math.max(0, Math.min(9, band)); // Ensure 0-9 range
       }
+
+      // Calculate overall band using proper IELTS rules
+      const bands = Object.values(sectionScores).filter(b => typeof b === 'number') as number[];
+      let overallBand = 0;
+
+      if (bands.length === 4) {
+        // All four skills present
+        overallBand = calculateOverallBand(
+          sectionScores.listeningBand || 0,
+          sectionScores.readingBand || 0, 
+          sectionScores.writingBand || 0,
+          sectionScores.speakingBand || 0
+        );
+      } else if (bands.length > 0) {
+        // Partial completion - use average
+        const average = bands.reduce((a, b) => a + b, 0) / bands.length;
+        overallBand = Math.round(average * 2) / 2;
+      }
+
+      sectionScores.overallBand = overallBand;
+
+      console.log("Calculated scores:", sectionScores);
+
+      // Update session with calculated scores
+      const updatedSession = await storage.updateTestSession(sessionId, sectionScores);
+
+      res.json({
+        message: "Scores calculated successfully",
+        scores: sectionScores,
+        session: updatedSession
+      });
     } catch (error: any) {
+      console.error("Score calculation error:", error);
       res.status(500).json({ error: error.message });
     }
   });

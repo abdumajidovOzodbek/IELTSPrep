@@ -55,6 +55,7 @@ export interface IStorage {
   // AI Evaluations
   createAiEvaluation(evaluation: InsertAiEvaluation): Promise<AiEvaluation>;
   getSessionEvaluations(sessionId: string): Promise<AiEvaluation[]>;
+  getEvaluationsForSession(sessionId: string, section?: string): Promise<AiEvaluation[]>; // Added method
 
   // Audio Recordings
   createAudioRecording(recording: InsertAudioRecording): Promise<AudioRecording>;
@@ -91,10 +92,43 @@ export class MongoStorage implements IStorage {
   private client: MongoClient;
   private db: Db;
 
+  // These are placeholders for collection references, assuming they would be initialized properly.
+  // The original code directly accessed this.db.collection("...")
+  // For the sake of applying the change, we'll assume these are meant to be used within methods
+  // and the actual MongoDB collection access is done via this.db.collection("...") as in the original.
+  // If these were intended to be class properties, they'd need initialization.
+  private users: any;
+  private testSessions: any;
+  private audioFiles: any;
+  private questions: any; // Assuming this refers to testQuestions collection
+  private answers: any;
+  private evaluations: any; // Assuming this refers to aiEvaluations collection
+  private recordings: any;
+  private listeningTests: any;
+  private listeningSections: any;
+  private readingTests: any;
+  private readingPassages: any;
+
+
   constructor() {
     const connectionString = process.env.DATABASE_URL || "mongodb+srv://ozod:1234ozod@cluster0.51dlocb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
     this.client = new MongoClient(connectionString);
     this.db = this.client.db("ielts_test_platform");
+
+    // Initializing collection references here as they are used in the added method.
+    // This is an assumption based on the presence of `this.questions` and `this.evaluations` in the snippet.
+    // In a real scenario, these would be initialized in the constructor after `this.db` is set.
+    this.users = this.db.collection("users");
+    this.testSessions = this.db.collection("testSessions");
+    this.audioFiles = this.db.collection("audioFiles");
+    this.questions = this.db.collection("testQuestions");
+    this.answers = this.db.collection("testAnswers");
+    this.evaluations = this.db.collection("aiEvaluations");
+    this.recordings = this.db.collection("audioRecordings");
+    this.listeningTests = this.db.collection("listeningTests");
+    this.listeningSections = this.db.collection("listeningSections");
+    this.readingTests = this.db.collection("reading_tests");
+    this.readingPassages = this.db.collection("reading_passages");
   }
 
   async connect(): Promise<void> {
@@ -301,6 +335,20 @@ export class MongoStorage implements IStorage {
     return evaluations.map(evaluation => ({ ...evaluation, _id: evaluation._id } as AiEvaluation));
   }
 
+  // Added method from changes
+  async getEvaluationsForSession(sessionId: string, section?: string): Promise<AiEvaluation[]> {
+    try {
+      const filter: any = { sessionId };
+      if (section) {
+        filter.section = section;
+      }
+      return await this.evaluations.find(filter).toArray();
+    } catch (error) {
+      console.error("Error getting evaluations for session:", error);
+      return [];
+    }
+  }
+
   // Audio Recordings
   async createAudioRecording(recordingData: InsertAudioRecording): Promise<AudioRecording> {
     const recording = { ...recordingData, recordedAt: new Date() };
@@ -494,7 +542,7 @@ export class MongoStorage implements IStorage {
   async getQuestionsByPassage(passageId: string): Promise<TestQuestion[]> {
     try {
       console.log("Searching for questions with passageId:", passageId);
-      
+
       // Try both string and ObjectId formats to be safe
       const questions = await this.db.collection('testQuestions')
         .find({ 
@@ -505,7 +553,7 @@ export class MongoStorage implements IStorage {
         })
         .sort({ orderIndex: 1 })
         .toArray();
-        
+
       console.log("Found questions:", questions.length);
       if (questions.length > 0) {
         console.log("First question:", {
@@ -514,7 +562,7 @@ export class MongoStorage implements IStorage {
           passageId: questions[0].passageId
         });
       }
-      
+
       return questions.map(question => ({ ...question, _id: question._id } as TestQuestion));
     } catch (error) {
       console.error("Error in getQuestionsByPassage:", error);
