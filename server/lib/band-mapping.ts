@@ -45,15 +45,19 @@ export const READING_BAND_MAPPING: BandMapping[] = [
   { minScore: 0, maxScore: 0, band: 0.0 },
 ];
 
-export function rawScoreToBand(rawScore: number, section: 'listening' | 'reading'): number {
-  const mapping = section === 'listening' ? LISTENING_BAND_MAPPING : READING_BAND_MAPPING;
-  
+export function rawScoreToBand(
+  rawScore: number,
+  section: "listening" | "reading",
+): number {
+  const mapping =
+    section === "listening" ? LISTENING_BAND_MAPPING : READING_BAND_MAPPING;
+
   for (const range of mapping) {
     if (rawScore >= range.minScore && rawScore <= range.maxScore) {
       return range.band;
     }
   }
-  
+
   return 0.0; // Default if no match found
 }
 
@@ -61,15 +65,16 @@ export function calculateOverallBand(
   listeningBand: number,
   readingBand: number,
   writingBand: number,
-  speakingBand: number
+  speakingBand: number,
 ): number {
-  const average = (listeningBand + readingBand + writingBand + speakingBand) / 4;
-  
+  const average =
+    (listeningBand + readingBand + writingBand + speakingBand) / 4;
+
   // IELTS rounding rules:
   // .25 rounds up to .5
   // .75 rounds up to next integer
   const decimal = average % 1;
-  
+
   if (decimal >= 0.75) {
     return Math.ceil(average);
   } else if (decimal >= 0.25) {
