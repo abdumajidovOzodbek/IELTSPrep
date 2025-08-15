@@ -23,19 +23,32 @@ export class ScoringService {
     questions.forEach(q => {
       if (q._id) {
         questionMap.set(q._id.toString(), q);
+        console.log(`Question ID: ${q._id.toString()}, Type: ${q.questionType}, Correct answers:`, q.correctAnswers);
       }
     });
 
     // Process only unique answers per question (avoid duplicates)
     const uniqueAnswers = new Map();
     answers.forEach(answer => {
-      if (answer.questionId && !uniqueAnswers.has(answer.questionId)) {
-        uniqueAnswers.set(answer.questionId, answer);
+      if (answer.questionId) {
+        if (!uniqueAnswers.has(answer.questionId)) {
+          uniqueAnswers.set(answer.questionId, answer);
+          console.log(`Answer for question ${answer.questionId}: "${answer.answer}" (type: ${typeof answer.answer})`);
+        } else {
+          console.log(`Duplicate answer found for question ${answer.questionId}, keeping first one`);
+        }
+      } else {
+        console.log(`Answer with missing questionId:`, answer);
       }
     });
 
     console.log(`Processing ${uniqueAnswers.size} unique answers for ${totalQuestions} questions`);
+    console.log(`Questions available: ${Array.from(questionMap.keys()).slice(0, 5)}...`);
+    console.log(`Answer question IDs: ${Array.from(uniqueAnswers.keys()).slice(0, 5)}...`);
 
+    let processedAnswers = 0;
+    let emptyAnswers = 0;
+    
     uniqueAnswers.forEach((answer, questionId) => {
       const question = questionMap.get(questionId);
       if (!question || !question.correctAnswers) {
@@ -43,17 +56,30 @@ export class ScoringService {
         return;
       }
 
-      const userAnswer = this.normalizeAnswer(answer.answer as string);
-      
-      // CRITICAL FIX: Reject empty or invalid answers
-      if (!userAnswer || userAnswer.length === 0) {
-        console.log(`✗ Empty answer for question ${questionId}`);
+      // More thorough answer validation
+      const rawAnswer = answer.answer;
+      if (!rawAnswer || 
+          (typeof rawAnswer === 'string' && rawAnswer.trim().length === 0) ||
+          rawAnswer === null || 
+          rawAnswer === undefined) {
+        console.log(`✗ Empty/null answer for question ${questionId} (raw value: ${JSON.stringify(rawAnswer)})`);
+        emptyAnswers++;
         return;
       }
 
+      const userAnswer = this.normalizeAnswer(rawAnswer as string);
+      
+      // Final check after normalization
+      if (!userAnswer || userAnswer.length === 0) {
+        console.log(`✗ Answer became empty after normalization for question ${questionId} (original: "${rawAnswer}")`);
+        emptyAnswers++;
+        return;
+      }
+
+      processedAnswers++;
       const correctAnswersList = question.correctAnswers as string[];
       
-      console.log(`Checking answer "${userAnswer}" against correct answers:`, correctAnswersList);
+      console.log(`Question ${questionId}: "${rawAnswer}" -> normalized: "${userAnswer}" vs correct:`, correctAnswersList);
       
       const isCorrect = correctAnswersList.some(correct => 
         this.compareAnswers(userAnswer, this.normalizeAnswer(correct))
@@ -61,11 +87,13 @@ export class ScoringService {
 
       if (isCorrect) {
         correctAnswers++;
-        console.log(`✓ Correct answer for question ${questionId}`);
+        console.log(`✓ CORRECT: Question ${questionId}`);
       } else {
-        console.log(`✗ Incorrect answer for question ${questionId}`);
+        console.log(`✗ INCORRECT: Question ${questionId}`);
       }
     });
+
+    console.log(`Summary: ${processedAnswers} valid answers processed, ${emptyAnswers} empty answers skipped, ${correctAnswers} correct answers found`);
 
     const accuracy = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
 

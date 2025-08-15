@@ -656,9 +656,15 @@ Return a JSON array with this format:
   // Test Answers
   app.post("/api/answers", async (req, res) => {
     try {
+      // Validate that answer is not empty before saving
+      const { answer } = req.body;
+      if (!answer || (typeof answer === 'string' && answer.trim().length === 0)) {
+        return res.status(400).json({ error: "Answer cannot be empty" });
+      }
+
       const answerData = insertTestAnswerSchema.parse(req.body);
-      const answer = await storage.createTestAnswer(answerData);
-      res.json(answer);
+      const savedAnswer = await storage.createTestAnswer(answerData);
+      res.json(savedAnswer);
     } catch (error: any) {
       console.error("Answer submission error:", error);
       res.status(400).json({ error: error.message });
@@ -669,10 +675,18 @@ Return a JSON array with this format:
   app.post("/api/test/submit-answer", async (req, res) => {
     try {
       console.log("Received answer submission:", JSON.stringify(req.body, null, 2));
+      
+      // Validate that answer is not empty before saving
+      const { answer } = req.body;
+      if (!answer || (typeof answer === 'string' && answer.trim().length === 0)) {
+        console.log("Rejecting empty answer for question:", req.body.questionId);
+        return res.status(400).json({ error: "Answer cannot be empty" });
+      }
+
       const answerData = insertTestAnswerSchema.parse(req.body);
-      const answer = await storage.createTestAnswer(answerData);
-      console.log("Answer saved successfully:", answer._id);
-      res.json(answer);
+      const savedAnswer = await storage.createTestAnswer(answerData);
+      console.log("Answer saved successfully:", savedAnswer._id);
+      res.json(savedAnswer);
     } catch (error: any) {
       console.error("Answer submission error:", error);
       console.error("Request body:", req.body);
