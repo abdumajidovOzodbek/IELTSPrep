@@ -676,11 +676,10 @@ Return a JSON array with this format:
     try {
       console.log("Received answer submission:", JSON.stringify(req.body, null, 2));
       
-      // Validate that answer is not empty before saving
+      // Accept all answers, including empty ones (they will be marked as incorrect during scoring)
       const { answer } = req.body;
       if (!answer || (typeof answer === 'string' && answer.trim().length === 0)) {
-        console.log("Rejecting empty answer for question:", req.body.questionId);
-        return res.status(400).json({ error: "Answer cannot be empty" });
+        console.log("Accepting empty answer for question:", req.body.questionId, "(will be marked incorrect)");
       }
 
       const answerData = insertTestAnswerSchema.parse(req.body);
@@ -1516,21 +1515,16 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
             console.log(`Found ${questions.length} questions for ${section}`);
 
             if (questions.length > 0) {
-              // Filter answers that actually belong to this section and have valid questionIds
+              // Filter answers that actually belong to this section (include empty answers - they count as incorrect)
               const validSectionAnswers = sectionAnswers.filter(a => {
-                // Must have a valid answer (not empty)
-                const hasValidAnswer = a.answer && a.answer.toString().trim().length > 0;
                 // Must match a question in this section
                 const hasValidQuestionId = questions.some(q => q._id!.toString() === a.questionId);
                 
                 if (!hasValidQuestionId) {
                   console.log(`Answer with questionId ${a.questionId} not found in ${section} questions`);
                 }
-                if (!hasValidAnswer) {
-                  console.log(`Answer with questionId ${a.questionId} is empty or invalid`);
-                }
                 
-                return hasValidQuestionId && hasValidAnswer;
+                return hasValidQuestionId;
               });
 
               console.log(`${section}: Processing ${validSectionAnswers.length} valid answers out of ${sectionAnswers.length} total`);

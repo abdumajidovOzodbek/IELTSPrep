@@ -56,24 +56,28 @@ export class ScoringService {
         return;
       }
 
-      // More thorough answer validation
+      // Check if answer is empty/null - count these as incorrect, don't skip them
       const rawAnswer = answer.answer;
-      if (!rawAnswer || 
+      const isEmpty = !rawAnswer || 
           (typeof rawAnswer === 'string' && rawAnswer.trim().length === 0) ||
           rawAnswer === null || 
-          rawAnswer === undefined) {
-        console.log(`✗ Empty/null answer for question ${questionId} (raw value: ${JSON.stringify(rawAnswer)})`);
+          rawAnswer === undefined;
+          
+      if (isEmpty) {
+        console.log(`✗ Empty/null answer for question ${questionId} (counting as incorrect)`);
         emptyAnswers++;
-        return;
+        processedAnswers++;
+        return; // Count as processed but don't mark as correct
       }
 
       const userAnswer = this.normalizeAnswer(rawAnswer as string);
       
       // Final check after normalization
       if (!userAnswer || userAnswer.length === 0) {
-        console.log(`✗ Answer became empty after normalization for question ${questionId} (original: "${rawAnswer}")`);
+        console.log(`✗ Answer became empty after normalization for question ${questionId} (original: "${rawAnswer}", counting as incorrect)`);
         emptyAnswers++;
-        return;
+        processedAnswers++;
+        return; // Count as processed but don't mark as correct
       }
 
       processedAnswers++;
