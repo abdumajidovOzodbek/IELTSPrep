@@ -1,4 +1,4 @@
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useEffect, useState } from "react";
@@ -48,7 +48,7 @@ interface ScoreDebugInfo {
 
 export default function Results() {
   const { sessionId } = useParams();
-  const [, navigate] = useNavigate(); // Use useNavigate for navigation
+  const [, setLocation] = useLocation(); // Use useLocation for navigation
   const [sessionData, setSessionData] = useState<SessionData | null>(null);
   const [evaluations, setEvaluations] = useState<EvaluationData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,7 +193,7 @@ export default function Results() {
           </CardHeader>
           <CardContent>
             <p className="text-gray-600 mb-4">{error || 'Session data not available'}</p>
-            <Button onClick={() => navigate('/')} className="w-full">
+            <Button onClick={() => setLocation('/')} className="w-full">
               <HomeIcon className="h-4 w-4 mr-2" />
               Return Home
             </Button>
@@ -405,7 +405,7 @@ export default function Results() {
             <Download className="h-5 w-5 mr-2" />
             Download Certificate
           </Button>
-          <Button variant="outline" size="lg" onClick={() => navigate('/')}>
+          <Button variant="outline" size="lg" onClick={() => setLocation('/')}>
             <RotateCcw className="h-5 w-5 mr-2" />
             Take Another Test
           </Button>
