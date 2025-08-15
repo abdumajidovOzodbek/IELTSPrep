@@ -1651,7 +1651,7 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
             const evaluations = await storage.getEvaluationsForSession(sessionId, section);
             if (evaluations && evaluations.length > 0) {
               // Use AI evaluation score
-              const avgBand = evaluations.reduce((sum, eval) => sum + eval.bandScore, 0) / evaluations.length;
+              const avgBand = evaluations.reduce((sum, evaluation) => sum + evaluation.bandScore, 0) / evaluations.length;
               band = Math.round(avgBand * 2) / 2; // Round to nearest 0.5
               console.log(`${section}: Using AI evaluation, band: ${band}`);
             } else {
