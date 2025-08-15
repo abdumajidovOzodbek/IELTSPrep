@@ -1504,6 +1504,10 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
               // Use band mapping from band-mapping.ts
               band = rawScoreToBand(result.rawScore, section as 'listening' | 'reading');
               
+              // Store the actual results for the response
+              sectionScores[`${section}Correct`] = result.correctAnswers;
+              sectionScores[`${section}Total`] = result.totalQuestions;
+              
               console.log(`${section}: ${result.correctAnswers}/${result.totalQuestions} correct, raw score: ${result.rawScore}, band: ${band}`);
             } else {
               // More sophisticated fallback based on answer content quality
@@ -1642,7 +1646,11 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
         session: updatedSession,
         debug: {
           totalAnswers: answers.length,
-          sectionBreakdown: Object.keys(answersBySection).map(k => `${k}: ${answersBySection[k].length}`)
+          sectionBreakdown: Object.keys(answersBySection).map(k => `${k}: ${answersBySection[k].length}`),
+          listeningScore: sectionScores.listeningCorrect !== undefined ? 
+            `${sectionScores.listeningCorrect}/${sectionScores.listeningTotal}` : 'Not calculated',
+          readingScore: sectionScores.readingCorrect !== undefined ? 
+            `${sectionScores.readingCorrect}/${sectionScores.readingTotal}` : 'Not calculated'
         }
       });
     } catch (error: any) {
