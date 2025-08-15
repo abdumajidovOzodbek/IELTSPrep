@@ -18,15 +18,39 @@ export class ScoringService {
 
     console.log(`Scoring ${answers.length} answers against ${questions.length} questions`);
 
+    // Create a map of questionId to question for faster lookup
+    const questionMap = new Map();
+    questions.forEach(q => {
+      if (q._id) {
+        questionMap.set(q._id.toString(), q);
+      }
+    });
+
+    // Process only unique answers per question (avoid duplicates)
+    const uniqueAnswers = new Map();
     answers.forEach(answer => {
-      // Fix: Use _id instead of id for question matching
-      const question = questions.find(q => q._id?.toString() === answer.questionId);
+      if (answer.questionId && !uniqueAnswers.has(answer.questionId)) {
+        uniqueAnswers.set(answer.questionId, answer);
+      }
+    });
+
+    console.log(`Processing ${uniqueAnswers.size} unique answers for ${totalQuestions} questions`);
+
+    uniqueAnswers.forEach((answer, questionId) => {
+      const question = questionMap.get(questionId);
       if (!question || !question.correctAnswers) {
-        console.log(`No question found for answer with questionId: ${answer.questionId}`);
+        console.log(`No question found for answer with questionId: ${questionId}`);
         return;
       }
 
       const userAnswer = this.normalizeAnswer(answer.answer as string);
+      
+      // CRITICAL FIX: Reject empty or invalid answers
+      if (!userAnswer || userAnswer.length === 0) {
+        console.log(`✗ Empty answer for question ${questionId}`);
+        return;
+      }
+
       const correctAnswersList = question.correctAnswers as string[];
       
       console.log(`Checking answer "${userAnswer}" against correct answers:`, correctAnswersList);
@@ -37,9 +61,9 @@ export class ScoringService {
 
       if (isCorrect) {
         correctAnswers++;
-        console.log(`✓ Correct answer for question ${answer.questionId}`);
+        console.log(`✓ Correct answer for question ${questionId}`);
       } else {
-        console.log(`✗ Incorrect answer for question ${answer.questionId}`);
+        console.log(`✗ Incorrect answer for question ${questionId}`);
       }
     });
 
@@ -71,11 +95,18 @@ export class ScoringService {
    * Compare two normalized answers with tolerance for common variations
    */
   private static compareAnswers(userAnswer: string, correctAnswer: string): boolean {
+    // CRITICAL: Both answers must be non-empty
+    if (!userAnswer || !correctAnswer || userAnswer.length === 0 || correctAnswer.length === 0) {
+      return false;
+    }
+
     if (userAnswer === correctAnswer) return true;
 
-    // Check if user answer contains the correct answer or vice versa
-    if (userAnswer.includes(correctAnswer) || correctAnswer.includes(userAnswer)) {
-      return true;
+    // Check if user answer contains the correct answer or vice versa (but both must be substantial)
+    if (userAnswer.length > 1 && correctAnswer.length > 1) {
+      if (userAnswer.includes(correctAnswer) || correctAnswer.includes(userAnswer)) {
+        return true;
+      }
     }
 
     // Handle number variations

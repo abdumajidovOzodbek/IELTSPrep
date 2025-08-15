@@ -1504,11 +1504,19 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
             if (questions.length > 0) {
               // Filter answers that actually belong to this section and have valid questionIds
               const validSectionAnswers = sectionAnswers.filter(a => {
+                // Must have a valid answer (not empty)
+                const hasValidAnswer = a.answer && a.answer.toString().trim().length > 0;
+                // Must match a question in this section
                 const hasValidQuestionId = questions.some(q => q._id!.toString() === a.questionId);
+                
                 if (!hasValidQuestionId) {
                   console.log(`Answer with questionId ${a.questionId} not found in ${section} questions`);
                 }
-                return hasValidQuestionId;
+                if (!hasValidAnswer) {
+                  console.log(`Answer with questionId ${a.questionId} is empty or invalid`);
+                }
+                
+                return hasValidQuestionId && hasValidAnswer;
               });
 
               console.log(`${section}: Processing ${validSectionAnswers.length} valid answers out of ${sectionAnswers.length} total`);
