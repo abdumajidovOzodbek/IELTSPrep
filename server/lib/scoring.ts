@@ -56,12 +56,14 @@ export class ScoringService {
         return;
       }
 
-      // Check if answer is empty/null - count these as incorrect, don't skip them
+      // FIXED: Better empty check - only treat truly empty answers as empty
       const rawAnswer = answer.answer;
-      const isEmpty = !rawAnswer || 
-          (typeof rawAnswer === 'string' && rawAnswer.trim().length === 0) ||
-          rawAnswer === null || 
-          rawAnswer === undefined;
+      console.log(`DEBUG: Raw answer for question ${questionId}:`, JSON.stringify(rawAnswer), `(type: ${typeof rawAnswer})`);
+      
+      const isEmpty = rawAnswer === null || 
+          rawAnswer === undefined || 
+          (typeof rawAnswer === 'string' && rawAnswer.trim() === '') ||
+          rawAnswer === '';
           
       if (isEmpty) {
         console.log(`✗ Empty/null answer for question ${questionId} (counting as incorrect)`);
@@ -83,7 +85,7 @@ export class ScoringService {
       processedAnswers++;
       const correctAnswersList = question.correctAnswers as string[];
       
-      console.log(`Question ${questionId}: "${rawAnswer}" -> normalized: "${userAnswer}" vs correct:`, correctAnswersList);
+      console.log(`Question ${questionId}: "${rawAnswer}" -> normalized: "${userAnswer}" vs correct:`, correctAnswersList.map(c => `"${c}" -> "${this.normalizeAnswer(c)}"`));
       
       const isCorrect = correctAnswersList.some(correct => 
         this.compareAnswers(userAnswer, this.normalizeAnswer(correct))
@@ -111,16 +113,26 @@ export class ScoringService {
   }
 
   /**
-   * Normalize answer for comparison (remove extra spaces, convert to lowercase, etc.)
+   * Normalize answer for comparison (FIXED: less aggressive normalization)
    */
   private static normalizeAnswer(answer: string): string {
     if (typeof answer !== 'string') return '';
     
-    return answer
+    // FIXED: Keep basic punctuation for multiple choice answers like "B)" or "A"
+    let normalized = answer
       .toLowerCase()
       .trim()
-      .replace(/\s+/g, ' ')
-      .replace(/[^\w\s]/g, ''); // Remove punctuation
+      .replace(/\s+/g, ' ');
+    
+    // For multiple choice answers (single letter), keep them simple
+    if (/^[a-d]\)?\s*$/i.test(answer.trim())) {
+      return answer.trim().toLowerCase().charAt(0); // Just return 'a', 'b', 'c', or 'd'
+    }
+    
+    // For longer answers, remove some punctuation but keep essential ones
+    normalized = normalized.replace(/[.,;:!?]/g, ''); // Remove common punctuation but keep parentheses
+    
+    return normalized;
   }
 
   /**
@@ -129,10 +141,15 @@ export class ScoringService {
   private static compareAnswers(userAnswer: string, correctAnswer: string): boolean {
     // CRITICAL: Both answers must be non-empty
     if (!userAnswer || !correctAnswer || userAnswer.length === 0 || correctAnswer.length === 0) {
+      console.log(`DEBUG: Empty comparison - user: "${userAnswer}", correct: "${correctAnswer}"`);
       return false;
     }
 
-    if (userAnswer === correctAnswer) return true;
+    console.log(`DEBUG: Comparing "${userAnswer}" === "${correctAnswer}"`);
+    if (userAnswer === correctAnswer) {
+      console.log(`DEBUG: Exact match found!`);
+      return true;
+    }
 
     // Check if user answer contains the correct answer or vice versa (but both must be substantial)
     if (userAnswer.length > 1 && correctAnswer.length > 1) {
