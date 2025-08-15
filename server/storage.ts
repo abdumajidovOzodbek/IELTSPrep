@@ -43,6 +43,7 @@ export interface IStorage {
   // Test Questions
   createTestQuestion(question: InsertTestQuestion): Promise<TestQuestion>;
   getTestQuestions(section: string): Promise<TestQuestion[]>;
+  getQuestionsBySection(section: string): Promise<TestQuestion[]>; // Added method
   getTestQuestion(id: string): Promise<TestQuestion | undefined>;
   updateTestQuestion(id: string, updates: Partial<TestQuestion>): Promise<TestQuestion | undefined>;
   getQuestionsByAudioFile(audioFileId: string): Promise<TestQuestion[]>;
@@ -50,6 +51,7 @@ export interface IStorage {
   // Test Answers
   createTestAnswer(answer: InsertTestAnswer): Promise<TestAnswer>;
   getSessionAnswers(sessionId: string): Promise<TestAnswer[]>;
+  getAnswersForSession(sessionId: string): Promise<TestAnswer[]>; // Added method
   getQuestionAnswer(sessionId: string, questionId: string): Promise<TestAnswer | undefined>;
 
   // AI Evaluations
@@ -265,11 +267,18 @@ export class MongoStorage implements IStorage {
   }
 
   async getTestQuestions(section: string): Promise<TestQuestion[]> {
-    const questions = await this.db.collection("testQuestions").find({
-      section,
-      isActive: true
-    }).sort({ orderIndex: 1 }).toArray();
-    return questions.map(question => ({ ...question, _id: question._id } as TestQuestion));
+    return await this.db.collection("test_questions")
+      .find({
+        section,
+        isActive: { $ne: false }
+      })
+      .sort({ orderIndex: 1 })
+      .toArray();
+  }
+
+  // Alternative method for getting questions by section (same as getTestQuestions)
+  async getQuestionsBySection(section: string): Promise<TestQuestion[]> {
+    return await this.getTestQuestions(section);
   }
 
   async getTestQuestion(id: string): Promise<TestQuestion | undefined> {
@@ -313,9 +322,16 @@ export class MongoStorage implements IStorage {
     return { ...answer, _id: result.insertedId } as TestAnswer;
   }
 
+  // Get all answers for a session
   async getSessionAnswers(sessionId: string): Promise<TestAnswer[]> {
-    const answers = await this.db.collection("testAnswers").find({ sessionId }).toArray();
-    return answers.map(answer => ({ ...answer, _id: answer._id } as TestAnswer));
+    return await this.db.collection("test_answers")
+      .find({ sessionId })
+      .toArray();
+  }
+
+  // Alternative method name for compatibility
+  async getAnswersForSession(sessionId: string): Promise<TestAnswer[]> {
+    return await this.getSessionAnswers(sessionId);
   }
 
   async getQuestionAnswer(sessionId: string, questionId: string): Promise<TestAnswer | undefined> {
@@ -545,7 +561,7 @@ export class MongoStorage implements IStorage {
 
       // Try both string and ObjectId formats to be safe
       const questions = await this.db.collection('testQuestions')
-        .find({ 
+        .find({
           $or: [
             { passageId: new ObjectId(passageId) },
             { passageId: passageId }

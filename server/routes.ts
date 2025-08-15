@@ -1445,96 +1445,131 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
 
       console.log("Answers by section:", Object.keys(answersBySection));
 
-      // Debug: Show sample answers to understand the data
-      Object.keys(answersBySection).forEach(section => {
-        const sampleAnswers = answersBySection[section].slice(0, 3);
-        console.log(`Sample ${section} answers:`, sampleAnswers.map(a => ({
-          questionId: a.questionId,
-          answer: a.answer,
-          answerType: typeof a.answer,
-          answerLength: a.answer ? a.answer.toString().length : 0
-        })));
-      });
-
-      // Calculate scores for each section based on actual content and correctness
+      // Calculate scores for each section using proper IELTS band mapping
       const sectionScores: any = {};
 
-      Object.keys(answersBySection).forEach(section => {
-        const sectionAnswers = answersBySection[section];
+      for (const [section, sectionAnswers] of Object.entries(answersBySection)) {
         console.log(`Evaluating ${section} section with ${sectionAnswers.length} total answers`);
 
-        // Filter out empty/blank answers
-        const validAnswers = sectionAnswers.filter(a => {
-          const answer = a.answer ? a.answer.toString().trim() : '';
-          return answer !== '' && answer.length > 0;
-        });
+        let band = 0;
 
-        console.log(`Found ${validAnswers.length} non-empty answers in ${section}`);
+        if (section === 'listening' || section === 'reading') {
+          try {
+            // Get questions for this section
+            const questions = await storage.getTestQuestions(section as any);
+            console.log(`Found ${questions.length} questions for ${section}`);
 
-        let band = 0; // Start with 0 for no answers
+            if (questions.length > 0) {
+              // Use proper scoring service
+              const result = ScoringService.scoreObjectiveAnswers(sectionAnswers, questions);
+              // Use band mapping from band-mapping.ts
+              band = rawScoreToBand(result.rawScore, section as 'listening' | 'reading');
+              
+              console.log(`${section}: ${result.correctAnswers}/${result.totalQuestions} correct, raw score: ${result.rawScore}, band: ${band}`);
+            } else {
+              // Fallback if no questions found - estimate based on answer quality
+              const validAnswers = sectionAnswers.filter(a => {
+                const answer = a.answer ? a.answer.toString().trim() : '';
+                return answer !== '' && answer.length > 2;
+              });
 
-        if (validAnswers.length === 0) {
-          // No valid answers = band 0
-          band = 0;
-        } else {
-          // Calculate based on answer quality and completeness
-          const totalQuestions = sectionAnswers.length;
-          const answerRate = validAnswers.length / Math.max(totalQuestions, 10); // Minimum 10 questions expected
-
-          // Basic scoring: start with answer completion rate
-          let baseScore = answerRate * 9.0; // Scale to max 9.0
-
-          // Evaluate answer quality for different sections
-          if (section === 'writing') {
-            // For writing, check answer length and content quality
-            const avgLength = validAnswers.reduce((sum, a) => {
-              return sum + (a.answer ? a.answer.toString().length : 0);
-            }, 0) / validAnswers.length;
-
-            // Minimum 150 words for Task 1, 250 for Task 2 (roughly 750-1250 characters)
-            if (avgLength < 100) baseScore *= 0.3; // Very short answers
-            else if (avgLength < 300) baseScore *= 0.6; // Short answers
-            else if (avgLength < 600) baseScore *= 0.8; // Adequate length
-            // Full score for longer answers
-
-          } else if (section === 'speaking') {
-            // For speaking, similar length-based evaluation
-            const avgLength = validAnswers.reduce((sum, a) => {
-              return sum + (a.answer ? a.answer.toString().length : 0);
-            }, 0) / validAnswers.length;
-
-            if (avgLength < 50) baseScore *= 0.3; // Very short responses
-            else if (avgLength < 150) baseScore *= 0.6; // Short responses
-            else if (avgLength < 300) baseScore *= 0.8; // Adequate responses
-
-          } else {
-            // For listening/reading, penalize very short answers
-            const shortAnswers = validAnswers.filter(a => 
-              a.answer && a.answer.toString().trim().length < 2
-            ).length;
-            const shortAnswerPenalty = shortAnswers / validAnswers.length;
-            baseScore *= (1 - shortAnswerPenalty * 0.5); // Reduce score for short answers
+              // Estimate raw score based on completion and answer quality
+              const estimatedRawScore = Math.round((validAnswers.length / Math.max(sectionAnswers.length, 40)) * 40);
+              band = rawScoreToBand(estimatedRawScore, section as 'listening' | 'reading');
+              
+              console.log(`${section}: Using fallback estimation, estimated raw score: ${estimatedRawScore}, band: ${band}`);
+            }
+          } catch (error) {
+            console.error(`Error scoring ${section}:`, error);
+            band = 0;
           }
 
-          // Apply minimum threshold - if you don't answer enough, you can't get high scores
-          if (answerRate < 0.3) baseScore = Math.min(baseScore, 4.0); // Max 4.0 if <30% answered
-          if (answerRate < 0.5) baseScore = Math.min(baseScore, 5.5); // Max 5.5 if <50% answered
+        } else if (section === 'writing' || section === 'speaking') {
+          try {
+            // Check for AI evaluations first
+            const evaluations = await storage.getEvaluationsForSession(sessionId, section);
+            if (evaluations && evaluations.length > 0) {
+              // Use AI evaluation score
+              const avgBand = evaluations.reduce((sum, evaluation) => sum + evaluation.bandScore, 0) / evaluations.length;
+              band = Math.round(avgBand * 2) / 2; // Round to nearest 0.5
+              console.log(`${section}: Using AI evaluation, band: ${band}`);
+            } else {
+              // Fallback: estimate based on answer completeness and length
+              const validAnswers = sectionAnswers.filter(a => {
+                const answer = a.answer ? a.answer.toString().trim() : '';
+                return answer !== '' && answer.length > 10;
+              });
 
-          band = Math.max(0, baseScore); // Ensure minimum 0
+              if (validAnswers.length === 0) {
+                band = 0;
+              } else {
+                const avgLength = validAnswers.reduce((sum, a) => {
+                  return sum + (a.answer ? a.answer.toString().length : 0);
+                }, 0) / validAnswers.length;
+
+                // Conservative scoring based on length (IELTS standards)
+                if (section === 'writing') {
+                  if (avgLength < 150) band = 2.0; // Below minimum Task 1 length
+                  else if (avgLength < 250) band = 4.0; // Below minimum Task 2 length  
+                  else if (avgLength < 400) band = 5.0; // Adequate length
+                  else if (avgLength < 600) band = 6.0; // Good length
+                  else band = 6.5; // Very good length (content quality still unknown)
+                } else { // speaking
+                  if (avgLength < 50) band = 2.0; // Very short responses
+                  else if (avgLength < 100) band = 4.0; // Short responses
+                  else if (avgLength < 200) band = 5.5; // Adequate responses
+                  else if (avgLength < 300) band = 6.0; // Good responses
+                  else band = 6.5; // Very good responses
+                }
+
+                // Apply completion penalty
+                const completionRate = validAnswers.length / Math.max(sectionAnswers.length, 1);
+                if (completionRate < 0.5) {
+                  band = Math.min(band, 3.0); // Severe penalty for incomplete
+                } else if (completionRate < 0.8) {
+                  band = Math.min(band, 5.0); // Moderate penalty
+                }
+              }
+              console.log(`${section}: Fallback scoring, avg length: ${validAnswers.length > 0 ? Math.round(validAnswers.reduce((sum, a) => sum + (a.answer ? a.answer.toString().length : 0), 0) / validAnswers.length) : 0}, band: ${band}`);
+            }
+          } catch (error) {
+            console.error(`Error evaluating ${section}:`, error);
+            band = 0;
+          }
+
+        } else if (section === 'unknown') {
+          // Skip unknown sections or handle them separately
+          console.log(`Skipping unknown section with ${sectionAnswers.length} answers`);
+          continue;
         }
 
+        // Ensure band is within valid range
+        band = Math.max(0, Math.min(9, band));
         sectionScores[`${section}Band`] = Math.round(band * 2) / 2; // Round to nearest 0.5
-        console.log(`${section} section: ${validAnswers.length}/${sectionAnswers.length} valid answers, band: ${sectionScores[`${section}Band`]}`);
-      });
+      }
 
-      // Calculate overall band (average of all sections)
-      const bands = Object.values(sectionScores).filter(b => typeof b === 'number') as number[];
-      const overallBand = bands.length > 0 ? 
-        Math.round((bands.reduce((a, b) => a + b, 0) / bands.length) * 2) / 2 : 6.0;
+      // Calculate overall band using proper IELTS rules
+      const validSections = ['listening', 'reading', 'writing', 'speaking'];
+      const sectionBands = validSections.map(section => sectionScores[`${section}Band`]).filter(band => band !== undefined);
+
+      let overallBand = 0;
+      if (sectionBands.length === 4) {
+        // Use proper IELTS overall band calculation
+        overallBand = calculateOverallBand(
+          sectionScores.listeningBand || 0,
+          sectionScores.readingBand || 0,
+          sectionScores.writingBand || 0,
+          sectionScores.speakingBand || 0
+        );
+      } else if (sectionBands.length > 0) {
+        // Partial test - use average but round properly
+        const average = sectionBands.reduce((a, b) => a + b, 0) / sectionBands.length;
+        overallBand = Math.round(average * 2) / 2;
+      }
 
       sectionScores.overallBand = overallBand;
 
-      console.log("Calculated scores:", sectionScores);
+      console.log("Final calculated scores:", sectionScores);
 
       // Update session with calculated scores
       const updatedSession = await storage.updateTestSession(sessionId, sectionScores);
@@ -1609,7 +1644,7 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
 
       const sectionScores: any = {};
 
-      // Calculate band scores for each section
+      // Calculate band scores for each section using proper IELTS band mapping
       for (const section of Object.keys(answersBySection)) {
         const sectionAnswers = answersBySection[section];
         console.log(`Evaluating ${section} section with ${sectionAnswers.length} total answers`);
@@ -1617,36 +1652,36 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
         let band = 0;
 
         if (section === 'listening' || section === 'reading') {
-          // For objective sections, use proper scoring
           try {
             // Get questions for this section to validate answers
-            const questions = await storage.getQuestionsBySection(section);
-            const relevantQuestions = questions.slice(0, Math.min(40, questions.length)); // Max 40 questions
+            const questions = await storage.getTestQuestions(section as any);
+            console.log(`Found ${questions.length} questions for ${section}`);
 
-            if (relevantQuestions.length > 0) {
-              // Use the scoring service
-              const result = ScoringService.scoreObjectiveAnswers(sectionAnswers, relevantQuestions);
+            if (questions.length > 0) {
+              // Use the proper scoring service
+              const result = ScoringService.scoreObjectiveAnswers(sectionAnswers, questions);
+              // Apply proper IELTS band mapping
               band = rawScoreToBand(result.rawScore, section as 'listening' | 'reading');
 
               console.log(`${section}: ${result.correctAnswers}/${result.totalQuestions} correct, raw score: ${result.rawScore}, band: ${band}`);
             } else {
-              // Fallback if no questions found
+              // Fallback if no questions found - estimate based on answer quality
               const validAnswers = sectionAnswers.filter(a => {
                 const answer = a.answer ? a.answer.toString().trim() : '';
-                return answer !== '' && answer.length > 0;
+                return answer !== '' && answer.length > 2;
               });
 
-              // Simple percentage-based calculation
-              const percentage = validAnswers.length / Math.max(sectionAnswers.length, 40);
-              const rawScore = Math.round(percentage * 40);
-              band = rawScoreToBand(rawScore, section as 'listening' | 'reading');
+              // Conservative estimation - percentage of valid answers mapped to raw score
+              const estimatedRawScore = Math.round((validAnswers.length / Math.max(sectionAnswers.length, 40)) * 40);
+              band = rawScoreToBand(estimatedRawScore, section as 'listening' | 'reading');
+              
+              console.log(`${section}: Fallback estimation, estimated raw score: ${estimatedRawScore}, band: ${band}`);
             }
           } catch (error) {
             console.error(`Error scoring ${section}:`, error);
             band = 0;
           }
         } else if (section === 'writing' || section === 'speaking') {
-          // For subjective sections, check if AI evaluation exists
           try {
             const evaluations = await storage.getEvaluationsForSession(sessionId, section);
             if (evaluations && evaluations.length > 0) {
@@ -1655,10 +1690,10 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
               band = Math.round(avgBand * 2) / 2; // Round to nearest 0.5
               console.log(`${section}: Using AI evaluation, band: ${band}`);
             } else {
-              // Fallback: basic assessment based on answer quality
+              // Conservative fallback scoring based on IELTS standards
               const validAnswers = sectionAnswers.filter(a => {
                 const answer = a.answer ? a.answer.toString().trim() : '';
-                return answer !== '' && answer.length > 0;
+                return answer !== '' && answer.length > 10;
               });
 
               if (validAnswers.length === 0) {
@@ -1668,65 +1703,82 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
                   return sum + (a.answer ? a.answer.toString().length : 0);
                 }, 0) / validAnswers.length;
 
-                // Length-based scoring with more realistic thresholds
+                // Conservative IELTS-based scoring
                 if (section === 'writing') {
-                  if (avgLength < 100) band = 2.0;
-                  else if (avgLength < 150) band = 3.5;
-                  else if (avgLength < 200) band = 5.0;
-                  else if (avgLength < 250) band = 6.0;
-                  else if (avgLength < 300) band = 7.0;
-                  else band = 7.5;
+                  // IELTS Writing requires minimum 150 words (Task 1) and 250 words (Task 2)
+                  if (avgLength < 150) band = 2.0; // Below minimum
+                  else if (avgLength < 250) band = 4.0; // Meeting Task 1 only
+                  else if (avgLength < 400) band = 5.0; // Basic completion
+                  else if (avgLength < 600) band = 6.0; // Good length
+                  else band = 6.5; // Excellent length (but content quality unknown)
                 } else { // speaking
-                  if (avgLength < 30) band = 2.0;
-                  else if (avgLength < 60) band = 4.0;
-                  else if (avgLength < 100) band = 5.5;
-                  else if (avgLength < 150) band = 6.5;
-                  else band = 7.0;
+                  // Speaking responses should be substantial
+                  if (avgLength < 50) band = 2.0; // Very brief
+                  else if (avgLength < 100) band = 4.0; // Short responses
+                  else if (avgLength < 200) band = 5.5; // Adequate detail
+                  else if (avgLength < 300) band = 6.0; // Good detail
+                  else band = 6.5; // Excellent detail
                 }
 
-                // Consider completion rate
+                // Apply completion penalty
                 const completionRate = validAnswers.length / Math.max(sectionAnswers.length, 1);
-                if (completionRate < 0.5) band = Math.min(band, 4.0);
-                else if (completionRate < 0.8) band = Math.min(band, 6.0);
+                if (completionRate < 0.5) {
+                  band = Math.min(band, 3.0); // Severe penalty for incomplete responses
+                } else if (completionRate < 0.8) {
+                  band = Math.min(band, 5.0); // Moderate penalty
+                }
               }
-              console.log(`${section}: Fallback scoring, band: ${band}`);
+              console.log(`${section}: Conservative fallback scoring, band: ${band}`);
             }
           } catch (error) {
             console.error(`Error evaluating ${section}:`, error);
             band = 0;
           }
+        } else if (section === 'unknown') {
+          // Skip unknown sections
+          console.log(`Skipping unknown section with ${sectionAnswers.length} answers`);
+          continue;
         }
 
         sectionScores[`${section}Band`] = Math.max(0, Math.min(9, band)); // Ensure 0-9 range
       }
 
-      // Calculate overall band using proper IELTS rules
-      const bands = Object.values(sectionScores).filter(b => typeof b === 'number') as number[];
-      let overallBand = 0;
+      // Calculate overall band using proper IELTS calculation rules
+      const validSections = ['listening', 'reading', 'writing', 'speaking'];
+      const sectionBands = validSections.map(section => sectionScores[`${section}Band`]).filter(band => band !== undefined);
 
-      if (bands.length === 4) {
-        // All four skills present
+      let overallBand = 0;
+      if (sectionBands.length === 4) {
+        // Use proper IELTS overall band calculation from band-mapping.ts
         overallBand = calculateOverallBand(
           sectionScores.listeningBand || 0,
           sectionScores.readingBand || 0, 
           sectionScores.writingBand || 0,
           sectionScores.speakingBand || 0
         );
-      } else if (bands.length > 0) {
-        // Partial completion - use average
-        const average = bands.reduce((a, b) => a + b, 0) / bands.length;
-        overallBand = Math.round(average * 2) / 2;
+      } else if (sectionBands.length > 0) {
+        // Partial completion - use average with proper rounding
+        const average = sectionBands.reduce((a, b) => a + b, 0) / sectionBands.length;
+        // Apply IELTS rounding rules manually
+        const decimal = average % 1;
+        if (decimal >= 0.75) {
+          overallBand = Math.ceil(average);
+        } else if (decimal >= 0.25) {
+          overallBand = Math.floor(average) + 0.5;
+        } else {
+          overallBand = Math.floor(average);
+        }
       }
 
       sectionScores.overallBand = overallBand;
 
-      console.log("Calculated scores:", sectionScores);
+      console.log("Final calculated scores using IELTS band mapping:", sectionScores);
 
       // Update session with calculated scores
       const updatedSession = await storage.updateTestSession(sessionId, sectionScores);
 
       res.json({
-        message: "Scores calculated successfully",
+        message: "Scores calculated successfully using IELTS band mapping",
         scores: sectionScores,
         session: updatedSession
       });
