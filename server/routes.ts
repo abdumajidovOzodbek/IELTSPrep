@@ -656,17 +656,27 @@ Return a JSON array with this format:
   // Test Answers
   app.post("/api/answers", async (req, res) => {
     try {
-      // Validate that answer is not empty before saving
-      const { answer } = req.body;
+      console.log("DEBUG: Received answer submission:", JSON.stringify(req.body, null, 2));
+      
+      // Accept all answers, including empty ones (they will be marked as incorrect during scoring)
+      const { answer, sessionId, questionId } = req.body;
+      
+      console.log(`DEBUG: Processing answer for question ${questionId}: "${answer}" (type: ${typeof answer})`);
+      
+      // Log if answer is empty but continue processing
       if (!answer || (typeof answer === 'string' && answer.trim().length === 0)) {
-        return res.status(400).json({ error: "Answer cannot be empty" });
+        console.log(`DEBUG: Empty answer received for question ${questionId}, saving anyway`);
       }
 
       const answerData = insertTestAnswerSchema.parse(req.body);
       const savedAnswer = await storage.createTestAnswer(answerData);
+      
+      console.log(`DEBUG: Answer saved successfully with ID: ${savedAnswer._id}, answer: "${savedAnswer.answer}"`);
+      
       res.json(savedAnswer);
     } catch (error: any) {
       console.error("Answer submission error:", error);
+      console.error("Request body:", req.body);
       res.status(400).json({ error: error.message });
     }
   });
@@ -698,6 +708,28 @@ Return a JSON array with this format:
       const answers = await storage.getSessionAnswers(req.params.sessionId);
       res.json(answers);
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Debug endpoint to check specific questions and answers
+  app.get("/api/debug/question/:questionId", async (req, res) => {
+    try {
+      const questionId = req.params.questionId;
+      const question = await storage.getTestQuestion(questionId);
+      
+      // Get all answers for this question across all sessions
+      const allAnswers = await storage.db.collection("testAnswers").find({ 
+        questionId: questionId 
+      }).toArray();
+
+      res.json({
+        question: question,
+        answers: allAnswers,
+        questionId: questionId
+      });
+    } catch (error: any) {
+      console.error("Debug error:", error);
       res.status(500).json({ error: error.message });
     }
   });
