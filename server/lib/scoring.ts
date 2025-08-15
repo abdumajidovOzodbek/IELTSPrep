@@ -62,30 +62,58 @@ export class ScoringService {
   private static compareAnswers(userAnswer: string, correctAnswer: string): boolean {
     if (userAnswer === correctAnswer) return true;
 
-    // Handle common variations
-    const variations = [
-      // Number formats
-      (ans: string) => ans.replace(/\b(\d+)\b/g, (match) => {
-        const num = parseInt(match);
-        if (!isNaN(num)) {
-          return [num.toString(), this.numberToWords(num)].join('|');
-        }
-        return match;
-      }),
-      
-      // Common synonyms (basic set)
-      (ans: string) => ans
-        .replace(/\b(big|large|huge)\b/g, 'big|large|huge')
-        .replace(/\b(small|little|tiny)\b/g, 'small|little|tiny')
-        .replace(/\b(happy|glad|pleased)\b/g, 'happy|glad|pleased'),
-    ];
+    // Check if user answer contains the correct answer or vice versa
+    if (userAnswer.includes(correctAnswer) || correctAnswer.includes(userAnswer)) {
+      return true;
+    }
 
-    // Try variations
-    for (const variation of variations) {
-      const variedUser = variation(userAnswer);
-      const variedCorrect = variation(correctAnswer);
+    // Handle number variations
+    const userNum = parseInt(userAnswer);
+    const correctNum = parseInt(correctAnswer);
+    if (!isNaN(userNum) && !isNaN(correctNum) && userNum === correctNum) {
+      return true;
+    }
+
+    // Handle common spelling variations and synonyms
+    const synonymMap: Record<string, string[]> = {
+      'big': ['large', 'huge', 'enormous', 'massive'],
+      'small': ['little', 'tiny', 'minute', 'petite'],
+      'happy': ['glad', 'pleased', 'joyful', 'delighted'],
+      'sad': ['unhappy', 'sorrowful', 'miserable', 'depressed'],
+      'good': ['excellent', 'great', 'wonderful', 'fine'],
+      'bad': ['terrible', 'awful', 'horrible', 'poor'],
+      'quick': ['fast', 'rapid', 'swift', 'speedy'],
+      'slow': ['sluggish', 'gradual', 'leisurely'],
+    };
+
+    // Check synonyms
+    for (const [base, synonyms] of Object.entries(synonymMap)) {
+      if ((userAnswer === base && synonyms.includes(correctAnswer)) ||
+          (correctAnswer === base && synonyms.includes(userAnswer)) ||
+          (synonyms.includes(userAnswer) && synonyms.includes(correctAnswer))) {
+        return true;
+      }
+    }
+
+    // Handle common IELTS answer patterns
+    // Remove articles and prepositions for comparison
+    const cleanUser = userAnswer.replace(/\b(a|an|the|in|on|at|of|for|with|by)\b/g, '').trim();
+    const cleanCorrect = correctAnswer.replace(/\b(a|an|the|in|on|at|of|for|with|by)\b/g, '').trim();
+    
+    if (cleanUser === cleanCorrect) {
+      return true;
+    }
+
+    // Check partial matches for multi-word answers
+    const userWords = userAnswer.split(/\s+/);
+    const correctWords = correctAnswer.split(/\s+/);
+    
+    if (userWords.length > 1 || correctWords.length > 1) {
+      // If user answer contains all words from correct answer (in any order)
+      const userWordsSet = new Set(userWords);
+      const correctWordsSet = new Set(correctWords);
       
-      if (variedUser.includes(variedCorrect) || variedCorrect.includes(variedUser)) {
+      if (correctWords.every(word => userWordsSet.has(word))) {
         return true;
       }
     }

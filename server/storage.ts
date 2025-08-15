@@ -267,13 +267,14 @@ export class MongoStorage implements IStorage {
   }
 
   async getTestQuestions(section: string): Promise<TestQuestion[]> {
-    return await this.db.collection("test_questions")
+    const questions = await this.db.collection("testQuestions")
       .find({
         section,
         isActive: { $ne: false }
       })
       .sort({ orderIndex: 1 })
       .toArray();
+    return questions.map(question => ({ ...question, _id: question._id } as TestQuestion));
   }
 
   // Alternative method for getting questions by section (same as getTestQuestions)
@@ -324,9 +325,10 @@ export class MongoStorage implements IStorage {
 
   // Get all answers for a session
   async getSessionAnswers(sessionId: string): Promise<TestAnswer[]> {
-    return await this.db.collection("test_answers")
+    const answers = await this.db.collection("testAnswers")
       .find({ sessionId })
       .toArray();
+    return answers.map(answer => ({ ...answer, _id: answer._id } as TestAnswer));
   }
 
   // Alternative method name for compatibility
