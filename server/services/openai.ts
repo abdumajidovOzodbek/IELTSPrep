@@ -380,29 +380,46 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
               {
                 "_id": "q1",
                 "questionType": "multiple_choice",
-                "question": "According to the passage, chocolate was first...",
-                "options": ["A) used as currency", "B) eaten as food", "C) drunk as a beverage", "D) used in ceremonies"],
-                "correctAnswer": "C",
+                "content": {
+                  "question": "According to the passage, chocolate was first...",
+                  "options": ["used as currency", "eaten as food", "drunk as a beverage", "used in ceremonies"]
+                },
+                "correctAnswers": ["C", "drunk as a beverage"],
                 "orderIndex": 1
               },
               {
                 "_id": "q2", 
-                "questionType": "true_false",
-                "question": "The Aztecs were the first civilization to cultivate cacao beans.",
-                "correctAnswer": "FALSE",
+                "questionType": "true_false_notgiven",
+                "content": {
+                  "question": "The Aztecs were the first civilization to cultivate cacao beans."
+                },
+                "correctAnswers": ["FALSE", "False", "false"],
                 "orderIndex": 2
               },
               {
                 "_id": "q3",
                 "questionType": "fill_blank", 
-                "question": "Complete the sentence: The Spanish conquistadors brought chocolate to _______ in the 16th century.",
-                "correctAnswer": "Europe",
+                "content": {
+                  "question": "Complete the sentence: The Spanish conquistadors brought chocolate to _______ in the 16th century."
+                },
+                "correctAnswers": ["Europe", "europe"],
                 "orderIndex": 3
               }
             ]
           }
         ]
       }
+
+      CRITICAL FORMATTING REQUIREMENTS:
+      1. ALL multiple choice questions MUST store BOTH the letter (A,B,C,D) AND the full option text in correctAnswers array
+      2. ALL questions must use "content" object structure 
+      3. Multiple choice options should NOT include letters (A), (B) etc - just the text
+      4. correctAnswers must be arrays with variations (case insensitive, common spellings)
+      
+      Example structures:
+      - Multiple Choice: {"correctAnswers": ["B", "eaten as food"], "content": {"question": "...", "options": ["used as currency", "eaten as food", "drunk as beverage", "used in ceremonies"]}}
+      - True/False: {"correctAnswers": ["TRUE", "True", "true"], "content": {"question": "..."}}  
+      - Fill blank: {"correctAnswers": ["Europe", "europe"], "content": {"question": "Complete: Spain brought chocolate to _______ in 1500s."}}
 
       Make authentic IELTS Academic reading content with:
       - Academic vocabulary and complex sentence structures
@@ -503,16 +520,28 @@ Return JSON with: { "prompt": "main question", "variations": ["easier", "harder"
                 "questionType": "multiple_choice",
                 "content": {
                   "question": "Which TWO things does the student prefer?",
-                  "options": ["A quiet environment", "B shared facilities", "C private bathroom", "D cooking facilities"],
+                  "options": ["quiet environment", "shared facilities", "private bathroom", "cooking facilities"],
                   "selectMultiple": 2
                 },
-                "correctAnswers": ["A", "C"],
+                "correctAnswers": ["A", "quiet environment", "C", "private bathroom"],
                 "orderIndex": 6
               }
             ]
           }
         ]
       }
+
+      CRITICAL FORMATTING REQUIREMENTS:
+      1. ALL multiple choice questions MUST store BOTH the letter (A,B,C,D) AND the full option text in correctAnswers array
+      2. ALL questions must use "content" object structure with consistent format
+      3. Multiple choice options should NOT include letters (A), (B) etc - just the text
+      4. correctAnswers must be arrays with acceptable variations
+      5. For form completion, use exact words that appear in transcript
+      
+      Example correct formats:
+      - Multiple Choice: {"correctAnswers": ["B", "shared facilities"], "content": {"question": "What does the student prefer?", "options": ["quiet room", "shared facilities", "private bathroom"]}}
+      - Form Completion: {"correctAnswers": ["John", "john"], "content": {"question": "First name: _______"}}
+      - Fill Blank: {"correctAnswers": ["library", "Library"], "content": {"question": "The meeting is in the _______."}}
 
       Make authentic IELTS content with realistic scenarios, proper British English, and exact IELTS question formats.`;
 
@@ -595,8 +624,10 @@ Return JSON with this EXACT structure:
     ${sectionNum === 1 ? `
     {
       "questionType": "form_completion",
-      "question": "First name: _______",
-      "correctAnswer": "John",
+      "content": {
+        "question": "First name: _______"
+      },
+      "correctAnswers": ["John", "john"],
       "orderIndex": 1,
       "formContext": {
         "formTitle": "Application Form",
@@ -606,8 +637,10 @@ Return JSON with this EXACT structure:
     },
     {
       "questionType": "form_completion",
-      "question": "Surname: _______", 
-      "correctAnswer": "Smith",
+      "content": {
+        "question": "Surname: _______"
+      },
+      "correctAnswers": ["Smith", "smith"],
       "orderIndex": 2,
       "formContext": {
         "formTitle": "Application Form",
@@ -617,8 +650,10 @@ Return JSON with this EXACT structure:
     },
     {
       "questionType": "form_completion",
-      "question": "Phone number: _______",
-      "correctAnswer": "07123456789",
+      "content": {
+        "question": "Phone number: _______"
+      },
+      "correctAnswers": ["07123456789"],
       "orderIndex": 3,
       "formContext": {
         "formTitle": "Application Form", 
@@ -628,8 +663,10 @@ Return JSON with this EXACT structure:
     },
     {
       "questionType": "form_completion",
-      "question": "Email address: _______",
-      "correctAnswer": "john@email.com",
+      "content": {
+        "question": "Email address: _______"
+      },
+      "correctAnswers": ["john@email.com"],
       "orderIndex": 4,
       "formContext": {
         "formTitle": "Application Form",
@@ -639,8 +676,10 @@ Return JSON with this EXACT structure:
     },
     {
       "questionType": "form_completion",
-      "question": "Preferred date: _______",
-      "correctAnswer": "15th March",
+      "content": {
+        "question": "Preferred date: _______"
+      },
+      "correctAnswers": ["15th March", "15 March"],
       "orderIndex": 5,
       "formContext": {
         "formTitle": "Application Form",
@@ -650,19 +689,30 @@ Return JSON with this EXACT structure:
     },
     {
       "questionType": "multiple_choice",
-      "question": "What is the main reason for the inquiry?",
-      "options": ["A) Option from transcript", "B) Option from transcript", "C) Option from transcript", "D) Option from transcript"],
-      "correctAnswer": "A",
+      "content": {
+        "question": "What is the main reason for the inquiry?",
+        "options": ["Option from transcript", "Option from transcript", "Option from transcript", "Option from transcript"]
+      },
+      "correctAnswers": ["A", "Option from transcript"],
       "orderIndex": 6
     }` : `
     {
       "questionType": "fill_blank",
-      "question": "The speaker mentions that _______ is important.",
-      "correctAnswer": "timing",
+      "content": {
+        "question": "The speaker mentions that _______ is important."
+      },
+      "correctAnswers": ["timing", "Timing"],
       "orderIndex": 1
     }`}
   ]
 }
+
+CRITICAL FORMATTING REQUIREMENTS:
+1. ALL questions must use "content" object structure
+2. ALL answers must use "correctAnswers" arrays (not "correctAnswer")
+3. For multiple choice: Include BOTH letter AND full option text in correctAnswers
+4. Options arrays should NOT contain letters (A), (B) - just the text
+5. Include case variations and common alternatives in correctAnswers
 
 IMPORTANT: Analyze the transcript and extract REAL information to create authentic questions. Replace example values with actual content from the transcript.`;
 
@@ -697,17 +747,18 @@ IMPORTANT: Analyze the transcript and extract REAL information to create authent
 
             // Add formContext for form_completion questions
             if (finalQuestionType === "form_completion") {
-              const fieldLabel = q.question.includes(':') ? q.question.split(':')[0].trim() : q.formContext?.fieldLabel || "Form Field";
+              const questionText = q.content?.question || q.question || "Form Field: _______";
+              const fieldLabel = questionText.includes(':') ? questionText.split(':')[0].trim() : q.formContext?.fieldLabel || "Form Field";
               return {
                 ...q,
                 questionType: finalQuestionType,
-                question: q.question, // Keep the original question format
+                content: q.content || { question: questionText },
                 formContext: {
                   formTitle: generatedQuestions.formTitle || q.formContext?.formTitle || "Application Form",
                   fieldLabel: fieldLabel,
                   fieldType: q.formContext?.fieldType || "text"
                 },
-                correctAnswer: q.correctAnswer || 'N/A',
+                correctAnswers: q.correctAnswers || [q.correctAnswer || 'N/A'],
                 orderIndex: index + 1
               };
             } else {
@@ -715,7 +766,8 @@ IMPORTANT: Analyze the transcript and extract REAL information to create authent
               return {
                 ...q,
                 questionType: finalQuestionType,
-                correctAnswer: q.correctAnswer || 'N/A',
+                content: q.content || { question: q.question || "Question text" },
+                correctAnswers: q.correctAnswers || [q.correctAnswer || 'N/A'],
                 orderIndex: index + 1
               };
             }
