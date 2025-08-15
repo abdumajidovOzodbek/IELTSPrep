@@ -1490,47 +1490,50 @@ Ensure all questions test different aspects of the passage and maintain IELTS Ac
 
         if (section === 'listening' || section === 'reading') {
           try {
-            // Get questions for this section - try multiple approaches
-            let questions = await storage.getTestQuestions(section as any);
+            // FIXED: Get questions by the actual question IDs from submitted answers
+            const questionIds = sectionAnswers.map(a => a.questionId).filter(Boolean);
+            console.log("Question IDs from answers:", questionIds.slice(0, 5));
             
-            if (questions.length === 0) {
-              // Fallback: try to get questions by matching questionIds from answers
-              console.log(`No questions found via getTestQuestions, trying direct match for ${section}`);
-              const questionIds = sectionAnswers.map(a => a.questionId).filter(Boolean);
-              console.log("Question IDs from answers:", questionIds.slice(0, 5));
-              
-              if (questionIds.length > 0) {
-                try {
-                  const directQuestions = await storage.db.collection("testQuestions").find({
-                    _id: { $in: questionIds.map(id => typeof id === 'string' ? new ObjectId(id) : id) }
-                  }).toArray();
-                  questions = directQuestions.map(q => ({ ...q, _id: q._id } as TestQuestion));
-                  console.log(`Found ${questions.length} questions via direct match`);
-                } catch (err) {
-                  console.error("Error with direct question lookup:", err);
-                }
+            let questions: TestQuestion[] = [];
+            
+            if (questionIds.length > 0) {
+              try {
+                const directQuestions = await storage.db.collection("testQuestions").find({
+                  _id: { $in: questionIds.map(id => typeof id === 'string' ? new ObjectId(id) : id) }
+                }).toArray();
+                questions = directQuestions.map(q => ({ ...q, _id: q._id } as TestQuestion));
+                console.log(`Found ${questions.length} questions for ${section} via direct question ID match`);
+              } catch (err) {
+                console.error("Error with direct question lookup:", err);
               }
+            }
+            
+            // Fallback: try the old method if direct lookup fails
+            if (questions.length === 0) {
+              console.log(`No questions found via direct match, trying getTestQuestions for ${section}`);
+              questions = await storage.getTestQuestions(section as any);
             }
 
             console.log(`Found ${questions.length} questions for ${section}`);
 
             if (questions.length > 0) {
-              // Filter answers that actually belong to this section (include empty answers - they count as incorrect)
-              const validSectionAnswers = sectionAnswers.filter(a => {
-                // Must match a question in this section
-                const hasValidQuestionId = questions.some(q => q._id!.toString() === a.questionId);
-                
-                if (!hasValidQuestionId) {
-                  console.log(`Answer with questionId ${a.questionId} not found in ${section} questions`);
+              // All answers should be valid since we fetched questions by their IDs
+              const validSectionAnswers = sectionAnswers;
+              
+              // Double-check that all answers have matching questions
+              const questionIdSet = new Set(questions.map(q => q._id!.toString()));
+              const validAnswers = validSectionAnswers.filter(a => {
+                const hasMatchingQuestion = questionIdSet.has(a.questionId);
+                if (!hasMatchingQuestion) {
+                  console.log(`Answer with questionId ${a.questionId} not found in questions set`);
                 }
-                
-                return hasValidQuestionId;
+                return hasMatchingQuestion;
               });
 
-              console.log(`${section}: Processing ${validSectionAnswers.length} valid answers out of ${sectionAnswers.length} total`);
+              console.log(`${section}: Processing ${validAnswers.length} valid answers out of ${sectionAnswers.length} total`);
               
               // Use proper scoring service
-              const result = ScoringService.scoreObjectiveAnswers(validSectionAnswers, questions);
+              const result = ScoringService.scoreObjectiveAnswers(validAnswers, questions);
               // Use band mapping from band-mapping.ts
               band = rawScoreToBand(result.rawScore, section as 'listening' | 'reading');
               
